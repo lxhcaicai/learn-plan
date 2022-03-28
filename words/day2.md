@@ -1,0 +1,15 @@
+- inedible  不能吃的
+- lizard 蜥蜴
+- hunger 饥饿
+- glassware 玻璃器皿
+- occupation 职业，消遣，日常活动，占领
+- debtor 债务人
+- concert 音乐会
+- microbe 微生物
+- dugout 独木舟，防空洞
+- akin 相似
+- algea 藻类
+- trip 旅游
+- slender 苗条的
+- retain 保留
+- drapery 布料
