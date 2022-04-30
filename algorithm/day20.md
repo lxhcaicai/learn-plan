@@ -11,15 +11,11 @@ using namespace std;
 
 const int N = 5e5 + 100;
 
-class Edge{
-public:
-	int tot = 0;
-	int head[N], nex[N], ver[N];
-	void addedge(int x, int y) {
-		ver[++tot] = y, nex[tot] = head[x];
-		head[x] = tot;
-	}
-}g1, g2;
+vector<int> head1(N, 0), head2(N, 0), nex(N << 1, 0), edge(N << 1, 0), ver(N << 1, 0);
+int tot = 0;
+void addedge(vector<int> &head, int x, int y) {
+	ver[++ tot] = y, nex[tot] = head[x], head[x] = tot;
+}  
 
 vector<int> a(N, 0);
 int num = 0, cnt = 0;
@@ -29,13 +25,13 @@ vector<int> c(N, 0);
 vector<int> ins(N, 0);
 stack<int> st;
 vector<int> dfn(N, 0);
-vector<int> val(N, 0);
-
+vector<int> val(N, 0); 
+ 
 void tarjan(int x) {
 	dfn[x] = low[x] = ++ num;
 	st.push(x), ins[x] = 1;
-	for(int i = g1.head[x]; i; i = g1.nex[i]) {
-		int y = g1.ver[i];
+	for(int i = head1[x]; i; i = nex[i]) {
+		int y = ver[i];
 		if(!dfn[y]) {
 			tarjan(y);
 			low[x] = min(low[x], low[y]);
@@ -56,6 +52,7 @@ void tarjan(int x) {
 	}
 } 
 
+
 int d[N];
 vector<int> deg(N, 0);
 void topo() {
@@ -68,8 +65,8 @@ void topo() {
 	}
 	while(!q.empty()) {
 		int x = q.front(); q.pop();
-		for(int i = g2.head[x]; i; i = g2.nex[i]) {
-			int y = g2.ver[i];
+		for(int i = head2[x]; i; i = nex[i]) {
+			int y = ver[i];
 			d[y] = max(d[y], d[x] + val[y]);
 			if(-- deg[y] == 0) q.push(y);
 		}
@@ -85,25 +82,29 @@ int main() {
 	for(int i = 1; i <= m; i ++) {
 		int x, y;
 		cin >> x >> y;
-		g1.addedge(x, y);
-	}
+		addedge(head1,x, y);
+	} 
+	
 	for(int i = 1; i <= n; i ++) {
-		if(!dfn[i]) 
+		if(!dfn[i]) {
 			tarjan(i);
+		}
 	}
 	
+	
 	for(int x = 1; x <= n; x ++) {
-		for(int i = g1.head[x]; i; i = g1.nex[i]) {
-			int y = g1.ver[i];
-			if(c[x] == c[y]) continue;
-			g2.addedge(c[x], c[y]);
+		for(int i = head1[x]; i; i = nex[i]) {
+			int y = ver[i];
+			if(c[x] == c[y])
+				continue;
+			addedge(head2, c[x], c[y]);
 			deg[c[y]] ++;
 		}
 	}
+	
 	topo();
-	int ans = *max_element(d + 1, d + 1 + cnt);
-	cout << ans << endl;
-	return 0;
+
+	cout << *max_element(d + 1, d + 1 + cnt) << endl;	
 }
 ```
 
