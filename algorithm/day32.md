@@ -38,3 +38,57 @@ int main() {
 }
 ```
 
+GO 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+const N = 1e6 + 100
+
+var (
+	vis   [1e8 + 5]bool
+	prime [5800000]int
+	cnt   int = 0
+)
+
+func getprime(n int) {
+	for i := 2; i <= n; i++ {
+		if vis[i] == false {
+			cnt++
+			prime[cnt] = i
+		}
+		for j := 1; j <= cnt && i*prime[j] <= n; j++ {
+			vis[i*prime[j]] = true
+			if i%prime[j] == 0 {
+				break
+			}
+
+		}
+	}
+}
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 3) + (x << 1) + int(b-'0')
+		}
+		return x
+	}
+	n, q := read(), read()
+	getprime(n)
+	for ; q > 0; q-- {
+		x := read()
+		fmt.Println(prime[x])
+	}
+}
+```
+

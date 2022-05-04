@@ -76,3 +76,108 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"container/list"
+	"fmt"
+	"math"
+	"os"
+)
+
+const N int = 1e5 + 100
+const INF = 0x3f3f3f3f
+
+var tot = 1
+var head, nex, edge, ver, cost [N << 1]int
+
+func addedge(x, y, z, c int) {
+	tot++
+	ver[tot] = y
+	nex[tot] = head[x]
+	head[x] = tot
+	edge[tot] = z
+	cost[tot] = c
+}
+
+var n, m, s, t int
+var d, pre, incf [N]int
+var ans, maxflow int = 0, 0
+
+func spfa() bool {
+	lis := list.New()
+	lis.PushBack(s)
+	var in [N]int
+	for i := 1; i <= n; i++ {
+		d[i] = INF
+	}
+	d[s] = 0
+	in[s] = 1
+	incf[s] = INF
+	for lis.Len() > 0 {
+		e := lis.Front()
+		lis.Remove(e)
+		x := e.Value.(int)
+		in[x] = 0
+		for i := head[x]; i != 0; i = nex[i] {
+			y := ver[i]
+			if edge[i] == 0 {
+				continue
+			}
+			if d[y] > d[x]+cost[i] {
+				d[y] = d[x] + cost[i]
+				incf[y] = int(math.Min(float64(incf[x]), float64(edge[i])))
+				pre[y] = i
+				if in[y] == 0 {
+					in[y] = 1
+					lis.PushBack(y)
+				}
+			}
+		}
+	}
+	if d[t] == INF {
+		return false
+	}
+	return true
+}
+
+func update() {
+	x := t
+	for s != x {
+		i := pre[x]
+		edge[i] -= incf[t]
+		edge[i^1] += incf[t]
+		x = ver[i^1]
+	}
+	maxflow += incf[t]
+	ans += incf[t] * d[t]
+}
+
+func main() {
+	var in = bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 3) + (x << 1) + int(b-'0')
+		}
+		return x
+	}
+
+	n, m, s, t = read(), read(), read(), read()
+	for i := 1; i <= m; i++ {
+		x, y, z, c := read(), read(), read(), read()
+		addedge(x, y, z, c)
+		addedge(y, x, 0, -c)
+	}
+	for spfa() {
+		update()
+	}
+	fmt.Printf("%d %d\n", maxflow, ans)
+}
+```
+
