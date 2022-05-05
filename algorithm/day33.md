@@ -61,3 +61,96 @@ int main() {
 } 
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+const N int = 1e6 + 100
+
+var (
+	vis   [N]int
+	prime [N]int
+	cnt   int
+)
+
+func getprime(n int) {
+	for i := 2; i <= n; i++ {
+		if vis[i] == 0 {
+			cnt++
+			prime[cnt] = i
+		}
+		for j := 1; j <= cnt && i*prime[j] <= n; j++ {
+			vis[i*prime[j]] = 1
+			if i%prime[j] == 0 {
+				break
+			}
+		}
+	}
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
+
+}
+
+func solve(l, r int) {
+	for i := 0; i < N; i++ {
+		vis[i] = 0
+	}
+	for i := 1; i <= cnt; i++ {
+		p := prime[i]
+		for j := max(2*p, (l+p-1)/p*p); j <= r; j += p {
+			vis[j-l] = 1
+		}
+	}
+	npr := make([]int, N)
+	var tot int = 0
+	for i := 0; i <= r-l; i++ {
+		if vis[i] == 0 && i+l != 1 {
+			tot++
+			npr[tot] = i + l
+		}
+	}
+	if tot < 2 {
+		fmt.Println("There are no adjacent primes.")
+		return
+	}
+
+	maxid, minid := 1, 1
+	for i := 1; i <= tot-1; i++ {
+		d := npr[i+1] - npr[i]
+		if npr[maxid+1]-npr[maxid] < d {
+			maxid = i
+		}
+		if npr[minid+1]-npr[minid] > d {
+			minid = i
+		}
+	}
+	fmt.Printf("%d,%d are closest, %d,%d are most distant.\n", npr[minid], npr[minid+1], npr[maxid], npr[maxid+1])
+}
+
+func main() {
+
+	getprime(1000000)
+	for {
+		var l, r int
+		_, err := fmt.Scan(&l, &r)
+		if err == io.EOF {
+			break
+		}
+		solve(l, r)
+	}
+}
+
+```
+
