@@ -24,6 +24,33 @@ int main() {
 }
 ```
 
+Go 版本：
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	var a, b, p int64
+	fmt.Scan(&a, &b, &p)
+
+	ksm := func(a, b, p int64) (res int64) {
+		res = 1
+		for ; b != 0; b >>= 1 {
+			if (b & 1) == 1 {
+				res = res * a % p
+			}
+			a = a * a % p
+		}
+		return res
+	}
+
+	fmt.Printf("%d^%d mod %d=%d\n", a, b, p, ksm(a, b, p))
+}
+
+```
+
 
 
 [P3811 【模板】乘法逆元](https://www.luogu.com.cn/problem/P3811)
@@ -49,4 +76,38 @@ int main() {
 	return 0;
 } 
 ```
+
+Go版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	var n, p int
+	fmt.Scan(&n, &p)
+
+	inv := make([]int, n+1)
+
+	inv[0] = 1
+	inv[1] = 1
+
+	for i := 2; i <= n; i++ {
+		inv[i] = (p - p/i) * inv[p%i] % p
+	}
+	out := bufio.NewWriter(os.Stdout)
+	for i := 1; i <= n; i++ {
+		fmt.Fprintln(out, inv[i])
+	}
+	out.Flush()
+}
+
+```
+
+
 
