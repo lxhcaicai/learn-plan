@@ -1,87 +1,72 @@
-## 协程（goroutine）与通道（channel
+# 算法题部分
 
-### 并发、并行和协程
+[【模板】卢卡斯定理/Lucas 定理](https://www.luogu.com.cn/problem/P3807)
 
-**什么是协程？**
-
-一个应用程序是运行在机器上的一个进程；进程是一个运行在自己内存地址空间里的独立执行体。一个进程由一个或多个操作系统线程组成，这些线程其实是共享同一个内存地址空间的一起工作的执行体。几乎所有'正式'的程序都是多线程的，以便让用户或计算机不必等待，或者能够同时服务多个请求（如 Web 服务器），或增加性能和吞吐量（例如，通过对不同的数据集并行执行代码）。
-
-并行是一种通过使用多处理器以提高速度的能力。所以并发程序可以是并行的，也可以不是。
-
-**不要使用全局变量或者共享内存，它们会给你的代码在并发运算的时候带来危险。**
-
-解决之道在于同步不同的线程，对数据加锁，这样同时就只有一个线程可以变更数据。在 Go 的标准库 `sync` 中有一些工具用来在低级别的代码中实现加锁；
-
-Go 更倾向于其他的方式，在诸多比较合适的范式中，有个被称作 `Communicating Sequential Processes（顺序通信处理）`（CSP, C. Hoare 发明的）还有一个叫做 `message passing-model（消息传递）`（已经运用在了其他语言中，比如 Erlang）。
-
-在 Go 中，应用程序并发处理的部分被称作 `goroutines（协程）`，它可以进行更有效的并发运算。在协程和操作系统线程之间并无一对一的关系：协程是根据一个或多个线程的可用性，映射（多路复用，执行于）在他们之上的；协程调度器在 Go 运行时很好的完成了这个工作。
-
-协程工作在相同的地址空间中，所以共享内存的方式一定是同步的；这个可以使用 `sync` 包来实现。
-
-：使用 4K 的栈内存就可以在堆中创建它们。因为创建非常廉价，必要的时候可以轻松创建并运行大量的协程（在同一个地址空间中 100,000 个连续的协程）。并且它们对栈进行了分割，从而动态的增加（或缩减）内存的使用；栈的管理是自动的，但不是由垃圾回收器管理的，而是在协程退出后自动释放。
-
-任何 Go 程序都必须有的 `main()` 函数也可以看做是一个协程，尽管它并没有通过 `go` 来启动。协程可以在程序初始化的过程中运行（在 `init()` 函数中）。
-
-在一个协程中，比如它需要进行非常密集的运算，你可以在运算循环中周期的使用 `runtime.Gosched()`：这会让出处理器，允许运行其他协程；它并不会使当前协程挂起，所以它会自动恢复执行。使用 `Gosched()` 可以使计算均匀分布，使通信不至于迟迟得不到响应。
-
-
-
-为了使你的程序可以使用多个核心运行，这时协程就真正的是并行运行了，你必须使用 `GOMAXPROCS` 变量。这会告诉运行时有多少个协程同时执行。
-
-并且只有 gc 编译器真正实现了协程，适当的把协程映射到操作系统线程。使用 `gccgo` 编译器，会为每一个协程创建操作系统线程。
-
-**使用GOMAXPROCS**
-
-在 gc 编译器下（6g 或者 8g）你必须设置 GOMAXPROCS 为一个大于默认值 1 的数值来允许运行时支持使用多于 1 个的操作系统线程，所有的协程都会共享同一个线程除非将 GOMAXPROCS 设置为一个大于 1 的数。当 GOMAXPROCS 大于 1 时，会有一个线程池管理许多的线程。通过 `gccgo` 编译器 GOMAXPROCS 有效的与运行中的协程数量相等。假设 n 是机器上处理器或者核心的数量。如果你设置环境变量 GOMAXPROCS>=n，或者执行 `runtime.GOMAXPROCS(n)`，接下来协程会被分割（分散）到 n 个处理器上。更多的处理器并不意味着性能的线性提升。有这样一个经验法则，对于 n 个核心的情况设置 GOMAXPROCS 为 n-1 以获得最佳性能，也同样需要遵守这条规则：协程的数量 > 1 + GOMAXPROCS > 1
-
-**goroutine_select2.go**
+Go版本
 
 ```go
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"runtime"
-	"time"
+	"os"
 )
 
-func main() {
-	// setting GOMAXPROCS to 2 gives +- 22% performance increase,
-	// but increasing the number doesn't increase the performance
-	// without GOMAXPROCS: +- 86000
-	// setting GOMAXPROCS to 2: +- 105000
-	// setting GOMAXPROCS to 3: +- 94000
-	runtime.GOMAXPROCS(2)
-	ch1 := make(chan int)
-	ch2 := make(chan int)
-
-	go pump1(ch1)
-	go pump2(ch2)
-	go suck(ch1, ch2)
-
-	time.Sleep(1e9)
-}
-
-func pump1(ch chan int) {
-	for i := 0; ; i++ {
-		ch <- i * 2
-	}
-}
-
-func pump2(ch chan int) {
-	for i := 0; ; i++ {
-		ch <- i + 5
-	}
-}
-
-func suck(ch1, ch2 chan int) {
-	for i := 0; ; i++ {
-		select {
-		case v := <-ch1:
-			fmt.Printf("%d - Received on channel 1: %d\n", i, v)
-		case v := <-ch2:
-			fmt.Printf("%d - Received on channel 2: %d\n", i, v)
+func ksm(a, b, p int) (res int) {
+	res = 1
+	for ; b > 0; b >>= 1 {
+		if (b & 1) == 1 {
+			res = res * a % p
 		}
+		a = a * a % p
+	}
+	return res
+}
+
+func C(n, m, p int) int {
+	if m > n {
+		return 0
+	}
+	if m > n-m {
+		m = n - m
+	}
+	a, b := 1, 1
+	for i := 1; i <= m; i++ {
+		a = a * (n - i + 1) % p
+	}
+	for i := 1; i <= m; i++ {
+		b = b * i % p
+	}
+	return a * ksm(b, p-2, p) % p
+}
+
+func lucas(n, m, p int) int {
+	if n < m {
+		return 0
+	}
+	if n <= p && m <= p {
+		return C(n, m, p)
+	}
+	return C(n%p, m%p, p) * lucas(n/p, m/p, p) % p
+}
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+		return x
+	}
+
+	n := read()
+	for ; n > 0; n-- {
+		a, b, p := read(), read(), read()
+		fmt.Println(lucas(a+b, b, p))
 	}
 }
 
@@ -89,2019 +74,1570 @@ func suck(ch1, ch2 chan int) {
 
 
 
-总结：GOMAXPROCS 等同于（并发的）线程数量，在一台核心数多于1个的机器上，会尽可能有等同于核心数的线程在并行运行。
+# 技术部分
 
-**如何用命令行指定使用的核心数量**
+## 接口(interface) 与 反射(reflection)
 
-使用 `flags` 包，如下：
+### 接口是什么
 
-```go
-var numCores = flag.Int("n", 2, "number of CPU cores to use")
-```
+但是 Go 语言里有非常灵活的 **接口** 概念，通过它可以实现很多面向对象的特性。接口提供了一种方式来 **说明** 对象的行为：如果谁能搞定这件事，它就可以用在这儿。
 
-在 main() 中：
+接口定义了一组方法（方法集），但是这些方法不包含（实现）代码：它们没有被实现（它们是抽象的）。接口里也不能包含变量。
 
-```go
-flag.Parse()
-runtime.GOMAXPROCS(*numCores)
-```
-
-协程可以通过调用`runtime.Goexit()`来停止，尽管这样做几乎没有必要。
-
-gorountine1.go
+通过如下格式定义接口：
 
 ```go
-package main
-
-import (
-	"fmt"
-	"time"
-)
-
-func main() {
-	fmt.Println("In main()")
-	go longWait()
-	go shortWait()
-	fmt.Println("About to sleep in main()")
-	// sleep works with a Duration in nanoseconds (ns) !
-	time.Sleep(10 * 1e9)
-	fmt.Println("At the end of main()")
-}
-
-func longWait() {
-	fmt.Println("Beginning longWait()")
-	time.Sleep(5 * 1e9) // sleep for 5 seconds
-	fmt.Println("End of longWait()")
-}
-
-func shortWait() {
-	fmt.Println("Beginning shortWait()")
-	time.Sleep(2 * 1e9) // sleep for 2 seconds
-	fmt.Println("End of shortWait()")
+type Namer interface {
+    Method1(param_list) return_type
+    Method2(param_list) return_type
+    ...
 }
 ```
 
->In main()
->About to sleep in main()
->Beginning longWait()
->Beginning shortWait()
->End of shortWait()
->End of longWait()
->At the end of main()
+上面的 `Namer` 是一个 **接口类型**
 
-`main()`，`longWait()` 和 `shortWait()` 三个函数作为独立的处理单元按顺序启动，然后开始并行运行。每一个函数都在运行的开始和结束阶段输出了消息。为了模拟他们运算的时间消耗，我们使用了 `time` 包中的 `Sleep` 函数。`Sleep()` 可以按照指定的时间来暂停函数或协程的执行，这里使用了纳秒（ns，符号 1e9 表示 1 乘 10 的 9 次方，e=指数）。
+（按照约定，只包含一个方法的）接口的名字由方法名加 `er` 后缀组成，例如 `Printer`、`Reader`、`Writer`、`Logger`、`Converter` 等等。还有一些不常用的方式（当后缀 `er` 不合适时），比如 `Recoverable`，此时接口名以 `able` 结尾，或者以 `I` 开头（像 `.NET` 或 `Java` 中那样）。
 
-他们按照我们期望的顺序打印出了消息，几乎都一样，可是我们明白这是模拟出来的，以并行的方式。我们让 `main()` 函数暂停 10 秒从而确定它会在另外两个协程之后结束。如果不这样（如果我们让 `main()` 函数停止 4 秒），`main()` 会提前结束，`longWait()` 则无法完成。如果我们不在 `main()` 中等待，协程会随着程序的结束而消亡。
-
-当 `main()` 函数返回的时候，程序退出：它不会等待任何其他非 main 协程的结束。这就是为什么在服务器程序中，每一个请求都会启动一个协程来处理，`server()` 函数必须保持运行状态。通常使用一个无限循环来达到这样的目的。
-
-另外，协程是独立的处理单元，一旦陆续启动一些协程，
-
-协程更有用的一个例子应该是在一个非常长的数组中查找一个元素。
-
-将数组分割为若干个不重复的切片，然后给每一个切片启动一个协程进行查找计算。这样许多并行的协程可以用来进行查找任务，整体的查找时间会缩短（除以协程的数量）。
-
- **Go 协程（goroutines）和协程（coroutines）**
-
-（译者注：标题中的“Go协程（goroutines）” 即是 14 章讲的协程指的是 Go 语言中的协程。而“协程（coroutines）”指的是其他语言中的协程概念，仅在本节出现。）
-
-在其他语言中，比如 C#，Lua 或者 Python 都有协程的概念。这个名字表明它和 Go协程有些相似，不过有两点不同：
-
-- Go 协程意味着并行（或者可以以并行的方式部署），协程一般来说不是这样的
-- Go 协程通过通道来通信；协程通过让出和恢复操作来通信
-
-Go 协程比协程更强大，也很容易从协程的逻辑复用到 Go 协程。
-
-###  协程间的信道
-
- Go 有一种特殊的类型，*通道（channel）*，就像一个可以用于发送类型化数据的管道，由其负责协程之间的通信，从而避开所有由共享内存导致的陷阱；这种通过通道进行通信的方式保证了同步性。数据在通道中进行传递：*在任何给定时间，一个数据被设计为只有一个协程可以对其访问，所以不会发生数据竞争。* 数据的所有权（可以读写数据的能力）也因此被传递。
-
-通道服务于通信的两个目的：值的交换，同步的，保证了两个计算（协程）任何时候都是可知状态。
-
-所以通道只能传输一种类型的数据，比如 `chan int` 或者 `chan string`，所有的类型都可以用于通道，空接口 `interface{}` 也可以，甚至可以（有时非常有用）创建通道的通道。
-
-通道实际上是类型化消息的队列：使数据得以传输。它是先进先出（FIFO）的结构所以可以保证发送给他们的元素的顺序（有些人知道，通道可以比作 Unix shells 中的双向管道（two-way pipe））。通道也是引用类型，所以我们使用 `make()` 函数来给它分配内存。这里先声明了一个字符串通道 ch1，然后创建了它（实例化）：
-
-```go
-var ch1 chan string
-ch1 = make(chan string)
-```
-
-当然可以更短： `ch1 := make(chan string)`。
-
-这里我们构建一个 int 通道的通道： `chanOfChans := make(chan chan int)`。
-
-或者函数通道：`funcChan := make(chan func())`
-
-**通信操作符 <-**
-
-这个操作符直观的标示了数据的传输：信息按照箭头的方向流动。
-
-流向通道（发送）
-
-`ch <- int1` 表示：用通道 ch 发送变量 int1（双目运算符，中缀 = 发送）
-
-从通道流出（接收），三种方式：
-
-`int2 = <- ch` 表示：变量 int2 从通道 ch（一元运算的前缀操作符，前缀 = 接收）接收数据（获取新值）；假设 int2 已经声明过了，如果没有的话可以写成：`int2 := <- ch`。
-
-`<- ch` 可以单独调用获取通道的（下一个）值，当前值会被丢弃，但是可以用来验证，所以以下代码是合法的：
-
-```go
-if <- ch != 1000{
-	...
-}
-```
-
-同一个操作符 `<-` 既用于**发送**也用于**接收**，但 Go 会根据操作对象弄明白该干什么 。虽非强制要求，但为了可读性通道的命名通常以 `ch` 开头或者包含 `chan` 。通道的发送和接收都是原子操作：它们总是互不干扰地完成。下面的示例展示了通信操作符的使用。
-
-goroutine2.go
-
-```go
-package main
-
-import (
-	"fmt"
-	"time"
-)
-
-func main() {
-	ch := make(chan string)
-
-	go sendData(ch)
-	go getData(ch)
-
-	time.Sleep(1e9)
-}
-
-func sendData(ch chan string) {
-	ch <- "Washington"
-	ch <- "Tripoli"
-	ch <- "London"
-	ch <- "Beijing"
-	ch <- "Tokyo"
-}
-
-func getData(ch chan string) {
-	var input string
-	// time.Sleep(2e9)
-	for {
-		input = <-ch
-		fmt.Printf("%s ", input)
-	}
-}
-```
-
->Washington Tripoli London Beijing Tokyo
-
-`main()` 函数中启动了两个协程：`sendData()` 通过通道 ch 发送了 5 个字符串，`getData()` 按顺序接收它们并打印出来。
-
-如果 2 个协程需要通信，你必须给他们同一个通道作为参数才行。
-
-尝试一下如果注释掉 `time.Sleep(1e9)` 会如何。
-
-我们发现协程之间的同步非常重要：
-
-- main() 等待了 1 秒让两个协程完成，如果不这样，sendData() 就没有机会输出。
-- getData() 使用了无限循环：它随着 sendData() 的发送完成和 ch 变空也结束了。
-- 如果我们移除一个或所有 `go` 关键字，程序无法运行，Go 运行时会抛出 panic：
-
-为什么会这样？运行时（runtime）会检查所有的协程（像本例中只有一个）是否在等待着什么东西（可从某个通道读取或者写入某个通道），这意味着程序将无法继续执行。这是死锁（deadlock）的一种形式，而运行时（runtime）可以为我们检测到这种情况。
-
-注意：不要使用打印状态来表明通道的发送和接收顺序：由于打印状态和通道实际发生读写的时间延迟会导致和真实发生的顺序不同。
-
-**通道阻塞**
-
-默认情况下，通信是同步且无缓冲的：在有接受者接收数据之前，发送不会结束。可以想象一个无缓冲的通道在没有空间来保存数据的时候：必须要一个接收者准备好接收通道的数据然后发送者可以直接把数据发送给接收者。所以通道的发送/接收操作在对方准备好之前是阻塞的：
-
-1）对于同一个通道，发送操作（协程或者函数中的），在接收者准备好之前是阻塞的：如果 ch 中的数据无人接收，就无法再给通道传入其他数据：新的输入无法在通道非空的情况下传入。所以发送操作会等待 ch 再次变为可用状态：就是通道值被接收时（可以传入变量）。
-
-2）对于同一个通道，接收操作是阻塞的（协程或函数中的），直到发送者可用：如果通道中没有数据，接收者就阻塞了
-
-程序 channel_block.go验证了以上理论
-
-channel_block.go
+interfaces.go
 
 ```go
 package main
 
 import "fmt"
 
-func main() {
-	ch1 := make(chan int)
-	go pump(ch1)       // pump hangs
-	fmt.Println(<-ch1) // prints only 0
+type Shaper interface {
+	Area() float32
 }
 
-func pump(ch chan int) {
-	for i := 0; ; i++ {
-		ch <- i
-	}
+type Square struct {
+	side float32
 }
-```
 
->0
-
-`pump()` 函数为通道提供数值，也被叫做生产者。
-
-为通道解除阻塞定义了 `suck` 函数来在无限循环中读取通道
-
-
-
-```go
-func suck(ch chan int) {
-	for {
-		fmt.Println(<-ch)
-	}
-}
-```
-
-在 `main()` 中使用协程开始它：
-
-```go
-go pump(ch1)
-go suck(ch1)
-time.Sleep(1e9)
-```
-
-给程序 1 秒的时间来运行：输出了上万个整数。
-
-**通过一个（或多个）通道交换数据进行协程同步**
-
-通信是一种同步形式：通过通道，两个协程在通信（协程会和）中某刻同步交换数据。无缓冲通道成为了多个协程同步的完美工具。
-
-甚至可以在通道两端互相阻塞对方，形成了叫做死锁的状态。Go 运行时会检查并 panic，停止程序。死锁几乎完全是由糟糕的设计导致的
-
-无缓冲通道会被阻塞。设计无阻塞的程序可以避免这种情况，或者使用带缓冲的通道。
-
-解释为什么下边这个程序会导致 panic：所有的协程都休眠了 - 死锁！
-
-```go
-package main
-
-import (
-	"fmt"
-)
-
-func f1(in chan int) {
-	fmt.Println(<-in)
+func (sq *Square) Area() float32 {
+	return sq.side * sq.side
 }
 
 func main() {
-	out := make(chan int)
-	out <- 2
-	go f1(out)
+	sq1 := new(Square)
+	sq1.side = 5
+
+	var areaIntf Shaper
+	areaIntf = sq1
+	// shorter,without separate declaration:
+	// areaIntf := Shaper(sq1)
+	// or even:
+	// areaIntf := sq1
+	fmt.Printf("The square has area: %f\n", areaIntf.Area())
 }
 ```
 
-**同步通道-使用带缓冲的通道**
+>The square has area: 25.000000
 
-一个无缓冲通道只能包含 1 个元素，有时显得很局限。我们给通道提供了一个缓存，可以在扩展的 `make` 命令中设置它的容量，如下：
+面的程序定义了一个结构体 `Square` 和一个接口 `Shaper`，接口有一个方法 `Area()`。
 
-```go
-buf := 100
-ch1 := make(chan string, buf)
-```
+在 `main()` 方法中创建了一个 `Square` 的实例。在主程序外边定义了一个接收者类型是 `Square` 方法的 `Area()`，用来计算正方形的面积：结构体 `Square` 实现了接口 `Shaper` 。
 
-buf 是通道可以同时容纳的元素（这里是 string）个数
+这是 **多态** 的 Go 版本，多态是面向对象编程中一个广为人知的概念：根据当前的类型选择正确的方法，或者说：同一种类型在不同的实例上似乎表现出不同的行为。
 
-在缓冲满载（缓冲被全部使用）之前，给一个带缓冲的通道发送数据是不会阻塞的，而从通道读取数据也不会阻塞，直到缓冲空了。
+如果 `Square` 没有实现 `Area()` 方法，编译器将会给出清晰的错误信息：
 
-缓冲容量和类型无关，所以可以（尽管可能导致危险）给一些通道设置不同的容量，只要他们拥有同样的元素类型。内置的 `cap` 函数可以返回缓冲区的容量。
+    cannot use sq1 (type *Square) as type Shaper in assignment:
+    *Square does not implement Shaper (missing Area method)
 
-如果容量大于 0，通道就是异步的了：缓冲满载（发送）或变空（接收）之前通信不会阻塞，元素会按照发送的顺序被接收。如果容量是 0 或者未设置，通信仅在收发双方准备好的情况下才可以成功。
+如果 `Shaper` 有另外一个方法 `Perimeter()`，但是`Square` 没有实现它，即使没有人在 `Square` 实例上调用这个方法，编译器也会给出上面同样的错误。
 
-同步：`ch :=make(chan type, value)`
-
-- value == 0 -> synchronous, unbuffered (阻塞）
-- value > 0 -> asynchronous, buffered（非阻塞）取决于 value 元素
-
-若使用通道的缓冲，你的程序会在“请求”激增的时候表现更好：更具弹性，专业术语叫：更具有伸缩性（scalable）。在设计算法时首先考虑使用无缓冲通道，只在不确定的情况下使用缓冲。
-
-**协程中用通道输出结果**
-
-为了知道计算何时完成，可以通过信道回报。在例子 `go sum(bigArray)` 中，要这样写：
+ [interfaces_poly.go](examples/chapter_11/interfaces_poly.go)：
 
 ```go
-ch := make(chan int)
-go sum(bigArray, ch) // bigArray puts the calculated sum on ch
-// .. do something else for a while
-sum := <- ch // wait for, and retrieve the sum
-```
-
-也可以使用通道来达到同步的目的，这个很有效的用法在传统计算机中称为信号量（semaphore）。或者换个方式：通过通道发送信号告知处理已经完成（在协程中）。
-
-在其他协程运行时让 main 程序无限阻塞的通常做法是在 `main` 函数的最后放置一个 `select {}`。
-
-也可以使用通道让 `main` 程序等待协程完成，就是所谓的信号量模式，我们会在接下来的部分讨论。
-
-**信号量模式**
-
-下边的片段阐明：协程通过在通道 `ch` 中放置一个值来处理结束的信号。`main` 协程等待 `<-ch` 直到从中获取到值。
-
-我们期望从这个通道中获取返回的结果，像这样：
-
-```go
-func compute(ch chan int){
-	ch <- someComputation() // when it completes, signal on the channel.
-}
-
-func main(){
-	ch := make(chan int) 	// allocate a channel.
-	go compute(ch)		// start something in a goroutines
-	doSomethingElseForAWhile()
-	result := <- ch
-}
-```
-
-这个信号也可以是其他的，不返回结果，比如下面这个协程中的匿名函数（lambda）协程：
-
-```go
-ch := make(chan int)
-go func(){
-	// doSomething
-	ch <- 1 // Send a signal; value does not matter
-}()
-doSomethingElseForAWhile()
-<- ch	// Wait for goroutine to finish; discard sent value.
-```
-
-或者等待两个协程完成，每一个都会对切片 s 的一部分进行排序，片段如下：
-
-```go
-done := make(chan bool)
-// doSort is a lambda function, so a closure which knows the channel done:
-doSort := func(s []int){
-	sort(s)
-	done <- true
-}
-i := pivot(s)
-go doSort(s[:i])
-go doSort(s[i:])
-<-done
-<-done
-```
-
-下边的代码，用完整的信号量模式对长度为 N 的 float64 切片进行了 N 个 `doSomething()` 计算并同时完成，通道 sem 分配了相同的长度（且包含空接口类型的元素），待所有的计算都完成后，发送信号（通过放入值）。在循环中从通道 sem 不停的接收数据来等待所有的协程完成。
-
-```go
-type Empty interface {}
-var empty Empty
-...
-data := make([]float64, N)
-res := make([]float64, N)
-sem := make(chan Empty, N)
-...
-for i, xi := range data {
-	go func (i int, xi float64) {
-		res[i] = doSomething(i, xi)
-		sem <- empty
-	} (i, xi)
-}
-// wait for goroutines to finish
-for i := 0; i < N; i++ { <-sem }
-```
-
-注意上述代码中闭合函数的用法：`i`、`xi` 都是作为参数传入闭合函数的，这一做法使得每个协程（译者注：在其启动时）获得一份 `i` 和 `xi` 的单独拷贝，从而向闭合函数内部屏蔽了外层循环中的 `i` 和 `xi` 变量；否则，for 循环的下一次迭代会更新所有协程中 `i` 和 `xi` 的值。另一方面，切片 `res` 没有传入闭合函数，因为协程不需要 `res` 的单独拷贝。切片 `res` 也在闭合函数中但并不是参数
-
-**实现并行的for 循环**
-
-for 循环的每一个迭代是并行完成的：
-
-```go
-for i, v := range data {
-	go func (i int, v float64) {
-		doSomething(i, v)
-		...
-	} (i, v)
-}
-```
-
-在 for 循环中并行计算迭代可能带来很好的性能提升。不过所有的迭代都必须是独立完成的。有些语言比如 Fortress 或者其他并行框架以不同的结构实现了这种方式，在 Go 中用协程实现起来非常容易：
-
- **用带缓冲通道实现一个信号量**
-
-信号量是实现互斥锁（排外锁）常见的同步机制，限制对资源的访问，解决读写问题，比如没有实现信号量的 `sync` 的 Go 包，使用带缓冲的通道可以轻松实现：
-
-- 带缓冲通道的容量和要同步的资源容量相同
-- 通道的长度（当前存放的元素个数）与当前资源被使用的数量相同
-- 容量减去通道的长度就是未处理的资源个数（标准信号量的整数值）
-
-不用管通道中存放的是什么，只关注长度；因此我们创建了一个长度可变但容量为 0（字节）的通道：
-
-```go
-type Empty interface {}
-type semaphore chan Empty
-```
-
-将可用资源的数量N来初始化信号量 `semaphore`：`sem = make(semaphore, N)`
-
-然后直接对信号量进行操作：
-
-将可用资源的数量N来初始化信号量 `semaphore`：`sem = make(semaphore, N)`
-
-然后直接对信号量进行操作：
-
-```go
-// acquire n resources
-func (s semaphore) P(n int) {
-	e := new(Empty)
-	for i := 0; i < n; i++ {
-		s <- e
-	}
-}
-
-// release n resources
-func (s semaphore) V(n int) {
-	for i:= 0; i < n; i++{
-		<- s
-	}
-}
-```
-
-可以用来实现一个互斥的例子：
-
-```go
-/* mutexes */
-func (s semaphore) Lock() {
-	s.P(1)
-}
-
-func (s semaphore) Unlock(){
-	s.V(1)
-}
-
-/* signal-wait */
-func (s semaphore) Wait(n int) {
-	s.P(n)
-}
-
-func (s semaphore) Signal() {
-	s.V(1)
-}
-```
-
-
-
-**练习：**
-
-用这种习惯用法写一个程序，开启一个协程来计算 2 个整数的和并等待计算结果并打印出来。
-
-gosum.go
-
-```go
-// gosum.go
-package main
-
-import (
-	"fmt"
-)
-
-func sum(x, y int, c chan int) {
-	c <- x + y
-}
-
-func main() {
-	c := make(chan int)
-	go sum(12, 13, c)
-	fmt.Println(<-c) // 25
-}
-
-```
-
-
-
-用这种习惯用法写一个程序，有两个协程，第一个提供数字 0，10，20，...90 并将他们放入通道，第二个协程从通道中读取并打印。`main()` 等待两个协程完成后再结束。
-
-producer_consumer.go
-
-```go
-// goroutines2.go
 package main
 
 import "fmt"
 
-// integer producer:
-func numGen(start, count int, out chan<- int) {
-	for i := 0; i < count; i++ {
-		out <- start
-		start = start + count
-	}
-	close(out)
+type Shaper interface {
+	Area() float32
 }
 
-// integer consumer:
-func numEchoRange(in <-chan int, done chan<- bool) {
-	for num := range in {
-		fmt.Printf("%d\n", num)
-	}
-	done <- true
+type Square struct {
+	side float32
+}
+
+func (sq *Square) Area() float32 {
+	return sq.side * sq.side
+}
+
+type Rectangle struct {
+	length, width float32
+}
+
+func (r Rectangle) Area() float32 {
+	return r.length * r.width
 }
 
 func main() {
-	numChan := make(chan int)
-	done := make(chan bool)
-	go numGen(0, 10, numChan)
-	go numEchoRange(numChan, done)
 
-	<-done
-}
-
-/* Output:
-0
-10
-20
-30
-40
-50
-60
-70
-80
-90
-*/
-
-```
-
-
-
-习惯用法：通道工厂模式
-
-编程中常见的另外一种模式如下：不将通道作为参数传递给协程，而用函数来生成一个通道并返回（工厂角色）；函数内有个匿名函数被协程调用。
-
-channel_block2.go
-
-```go
-package main
-
-import (
-	"fmt"
-	"time"
-)
-
-func main() {
-	stream := pump()
-	go suck(stream)
-	time.Sleep(1e9)
-}
-
-func pump() chan int {
-	ch := make(chan int)
-	go func() {
-		for i := 0; ; i++ {
-			ch <- i
-		}
-	}()
-	return ch
-}
-
-func suck(ch chan int) {
-	for {
-		fmt.Println(<-ch)
+	r := Rectangle{5, 3} // Area() of Rectangle needs a value
+	q := &Square{5}      // Area() of Square needs a pointer
+	// shapes := []Shaper{Shaper(r), Shaper(q)}
+	// or shorter
+	shapes := []Shaper{r, q}
+	fmt.Println("Looping through shapes for area ...")
+	for n, _ := range shapes {
+		fmt.Println("Shape details: ", shapes[n])
+		fmt.Println("Area of this shape is: ", shapes[n].Area())
 	}
 }
 ```
-
-**给通道使用for 循环**
-
-`for` 循环的 `range` 语句可以用在通道 `ch` 上，便可以从通道中获取值，像这样：
-
-```go
-for v := range ch {
-	fmt.Printf("The value is %v\n", v)
-}
-```
-
-它从指定通道中读取数据直到通道关闭，才继续执行下边的代码。很明显，另外一个协程必须写入 `ch`（不然代码就阻塞在 for 循环了），而且必须在写入完成后才关闭。`suck` 函数可以这样写，且在协程中调用这个动作，程序变成了这样：
-
-在协程里，一个 for 循环迭代容器 c 中的元素（对于树或图的算法，这种简单的 for 循环可以替换为深度优先搜索）。
-
-调用这个方法的代码可以这样迭代容器：
-
-```go
-for x := range container.Iter() { ... }
-```
-
-其运行在自己启动的协程中，所以上边的迭代用到了一个通道和两个协程（可能运行在不同的线程上）。 这样我们就有了一个典型的生产者-消费者模式。如果在程序结束之前，向通道写值的协程未完成工作，则这个协程不会被垃圾回收；这是设计使然。这种看起来并不符合预期的行为正是由通道这种线程安全的通信方式所导致的。如此一来，一个协程为了写入一个永远无人读取的通道而被挂起就成了一个 bug ，而并非你预想中的那样被悄悄回收掉（garbage-collected）了。
-
-习惯用法：生产者消费者模式
-
-假设你有 `Produce()` 函数来产生 `Consume` 函数需要的值。它们都可以运行在独立的协程中，生产者在通道中放入给消费者读取的值。整个处理过程可以替换为无限循环：
-
-```go
-for {
-	Consume(Produce())
-}
-```
-
-**通道的方向**
-
-通道类型可以用注解来表示它只发送或者只接收：
-
-```go
-var send_only chan<- int 		// channel can only receive data
-var recv_only <-chan int		// channel can only send data
-```
-
-只接收的通道（<-chan T）无法关闭，因为关闭通道是发送者用来表示不再给通道发送值了，所以对只接收通道是没有意义的。通道创建的时候都是双向的，但也可以分配有方向的通道变量，就像以下代码：
-
-```go
-var c = make(chan int) // bidirectional
-go source(c)
-go sink(c)
-
-func source(ch chan<- int){
-	for { ch <- 1 }
-}
-
-func sink(ch <-chan int) {
-	for { <-ch }
-}
-```
-
-习惯用法：**管道和选择器模式**
-
-更具体的例子还有协程处理它从通道接收的数据并发送给输出通道：
-
-```go
-sendChan := make(chan int)
-receiveChan := make(chan string)
-go processChannel(sendChan, receiveChan)
-
-func processChannel(in <-chan int, out chan<- string) {
-	for inValue := range in {
-		result := ... /// processing inValue
-		out <- result
-	}
-}
-```
-
-
-
-一个来自 Go 指导的很赞的例子，打印了输出的素数，使用选择器（‘筛’）作为它的算法。每个 prime 都有一个选择器
-
-```go
-// Copyright 2009 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.package main
-package main
-
-import "fmt"
-
-// Send the sequence 2, 3, 4, ... to channel 'ch'.
-func generate(ch chan int) {
-	for i := 2; ; i++ {
-		ch <- i // Send 'i' to channel 'ch'.
-	}
-}
-
-// Copy the values from channel 'in' to channel 'out',
-// removing those divisible by 'prime'.
-func filter(in, out chan int, prime int) {
-	for {
-		i := <-in // Receive value of new variable 'i' from 'in'.
-		if i%prime != 0 {
-			out <- i // Send 'i' to channel 'out'.
-		}
-	}
-}
-
-// The prime sieve: Daisy-chain filter processes together.
-func main() {
-	ch := make(chan int) // Create a new channel.
-	go generate(ch)      // Start generate() as a goroutine.
-	for {
-		prime := <-ch
-		fmt.Print(prime, " ")
-		ch1 := make(chan int)
-		go filter(ch, ch1, prime)
-		ch = ch1
-	}
-}
-```
-
-协程 `filter(in, out chan int, prime int)` 拷贝整数到输出通道，丢弃掉可以被 prime 整除的数字。然后每个 prime 又开启了一个新的协程，生成器和选择器并发请求。
 
 输出：
 
->2 3 5 7 11 13 17 19 23 29 31 37 41 43 47 53 59 61 67 71 73 79 83 89 97 101
->103 107 109 113 127 131 137 139 149 151 157 163 167 173 179 181 191 193 197 199 211 223
->227 229 233 239 241 251 257 263 269 271 277 281 283 293 307 311 313 317 331 337 347 349
->353 359 367 373 379 383 389 397 401 409 419 421 431 433 439 443 449 457 461 463 467 479
->487 491 499 503 509 521 523 541 547 557 563 569 571 577 587 593 599 601 607 613 617 619
->631 641 643 647 653 659 661 673 677 683 691 701 709 719 727 733 739 743 751 757 761 769
->773 787 797 809 811 821 823 827 829 839 853 857 859 863 877 881 883 887 907 911 919 929
->937 941 947 953 967 971 977 983 991 997 1009 1013...
+    Looping through shapes for area ...
+    Shape details:  {5 3}
+    Area of this shape is:  15
+    Shape details:  &{5}
+    Area of this shape is:  25
 
-第二个版本引入了上边的习惯用法：函数 `sieve`、`generate` 和 `filter` 都是工厂；它们创建通道并返回，而且使用了协程的 lambda 函数。`main` 函数现在短小清晰：它调用 `sieve()` 返回了包含素数的通道，然后通过 `fmt.Println(<-primes)` 打印出来。
-
-sileve2.go
-
-```go
-// Copyright 2009 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-package main
-
-import (
-	"fmt"
-)
-
-// Send the sequence 2, 3, 4, ... to returned channel
-func generate() chan int {
-	ch := make(chan int)
-	go func() {
-		for i := 2; ; i++ {
-			ch <- i
-		}
-	}()
-	return ch
-}
-
-// Filter out input values divisible by 'prime', send rest to returned channel
-func filter(in chan int, prime int) chan int {
-	out := make(chan int)
-	go func() {
-		for {
-			if i := <-in; i%prime != 0 {
-				out <- i
-			}
-		}
-	}()
-	return out
-}
-
-func sieve() chan int {
-	out := make(chan int)
-	go func() {
-		ch := generate()
-		for {
-			prime := <-ch
-			ch = filter(ch, prime)
-			out <- prime
-		}
-	}()
-	return out
-}
-
-func main() {
-	primes := sieve()
-	for {
-		fmt.Println(<-primes)
-	}
-}
-```
+在调用 `shapes[n].Area() ` 这个时，只知道 `shapes[n]` 是一个 `Shaper` 对象，最后它摇身一变成为了一个 `Square` 或 `Rectangle` 对象，并且表现出了相对应的行为。
 
 
 
-### 协程的同步：关闭通道-测试阻塞的通道
+下面是一个更具体的例子：有两个类型 `stockPosition` 和 `car`，它们都有一个 `getValue()` 方法，我们可以定义一个具有此方法的接口 `valuable`。接着定义一个使用 `valuable` 类型作为参数的函数 `showValue()`，所有实现了 `valuable` 接口的类型都可以用这个函数。
 
-通道可以被显式的关闭；尽管它们和文件不同：不必每次都关闭。只有在当需要告诉接收者不会再提供新的值的时候，才需要关闭通道。只有发送者需要关闭通道，接收者永远不会需要。
-
-第一个可以通过函数 `close(ch)` 来完成：这个将通道标记为无法通过发送操作 `<-` 接受更多的值；给已经关闭的通道发送或者再次关闭都会导致运行时的 panic。在创建一个通道后使用 defer 语句是个不错的办法（类似这种情况）：
-
-```go
-ch := make(chan float64)
-defer close(ch)
-```
-
-第二个问题可以使用逗号，ok 操作符：用来检测通道是否被关闭。
-
-如何来检测可以收到没有被阻塞（或者通道没有被关闭）？
-
-```go
-v, ok := <-ch   // ok is true if v received value
-```
-
-通常和 if 语句一起使用：
-
-```go
-if v, ok := <-ch; ok {
-  process(v)
-}
-```
-
-或者在 for 循环中接收的时候，当关闭的时候使用 break：
-
-```go
-v, ok := <-ch
-if !ok {
-  break
-}
-process(v)
-```
-
-而检测通道当前是否阻塞，需要使用 select
-
-```go
-select {
-case v, ok := <-ch:
-  if ok {
-    process(v)
-  } else {
-    fmt.Println("The channel is closed")
-  }
-default:
-  fmt.Println("The channel is blocked")
-}
-```
-
-gorountine3.go
+valuable.go
 
 ```go
 package main
 
 import "fmt"
 
+type stockPosition struct {
+	ticker     string
+	sharePrice float32
+	count      float32
+}
+
+/* method to determine the value of a stock position */
+func (s stockPosition) getValue() float32 {
+	return s.sharePrice * s.count
+}
+
+type car struct {
+	make  string
+	model string
+	price float32
+}
+
+/* method to determine the value of a car */
+func (c car) getValue() float32 {
+	return c.price
+}
+
+/* contract that defines different things that have value */
+type valuable interface {
+	getValue() float32
+}
+
+func showValue(asset valuable) {
+	fmt.Printf("Value of the asset is %f\n", asset.getValue())
+}
+
 func main() {
-	ch := make(chan string)
-	go sendData(ch)
-	getData(ch)
-}
-
-func sendData(ch chan string) {
-	ch <- "Washington"
-	ch <- "Tripoli"
-	ch <- "London"
-	ch <- "Beijing"
-	ch <- "Tokio"
-	close(ch)
-}
-
-func getData(ch chan string) {
-	for {
-		input, open := <-ch
-		if !open {
-			break
-		}
-		fmt.Printf("%s ", input)
-	}
+	var o valuable = stockPosition{"GOOG", 577.20, 4}
+	showValue(o)
+	o = car{"BMW", "M3", 66500}
+	showValue(o)
 }
 ```
 
-改变了以下代码：
+>Value of the asset is 2308.800049
+>Value of the asset is 66500.000000
 
-- 现在只有 `sendData()` 是协程，`getData()` 和 `main()` 在同一个线程中：
+**一个标准库的例子**
+
+`io` 包里有一个接口类型 `Reader`:
 
 ```go
-go sendData(ch)
-getData(ch)
-```
-
-- 在 `sendData()` 函数的最后，关闭了通道：
-
-```go
-func sendData(ch chan string) {
-	ch <- "Washington"
-	ch <- "Tripoli"
-	ch <- "London"
-	ch <- "Beijing"
-	ch <- "Tokio"
-	close(ch)
+type Reader interface {
+    Read(p []byte) (n int, err error)
 }
 ```
 
-- 在 for 循环的 `getData()` 中，在每次接收通道的数据之前都使用 `if !open` 来检测：
+定义变量 `r`：` var r io.Reader`
+
+那么就可以写如下的代码：
 
 ```go
-for {
-		input, open := <-ch
-		if !open {
-			break
-		}
-		fmt.Printf("%s ", input)
-	}
+	var r io.Reader
+	r = os.Stdin    // see 12.1
+	r = bufio.NewReader(r)
+	r = new(bytes.Buffer)
+	f,_ := os.Open("test.txt")
+	r = bufio.NewReader(f)
 ```
 
-使用 for-range 语句来读取通道是更好的办法，因为这会自动检测通道是否关闭：
+上面 `r` 右边的类型都实现了 `Read()` 方法，并且有相同的方法签名，`r` 的静态类型是 `io.Reader`。
+
+### 接口嵌套接口
+
+一个接口可以包含一个或多个其他的接口，这相当于直接将这些内嵌接口的方法列举在外层接口中一样。
+
+比如接口 `File` 包含了 `ReadWrite` 和 `Lock` 的所有方法，它还额外有一个 `Close()` 方法。
 
 ```go
-for input := range ch {
-  	process(input)
+type ReadWrite interface {
+    Read(b Buffer) bool
+    Write(b Buffer) bool
+}
+
+type Lock interface {
+    Lock()
+    Unlock()
+}
+
+type File interface {
+    ReadWrite
+    Lock
+    Close()
 }
 ```
 
-阻塞和生产者-消费者模式：
 
-通道迭代器中，两个协程经常是一个阻塞另外一个。如果程序工作在多核心的机器上，大部分时间只用到了一个处理器。可以通过使用带缓冲（缓冲空间大于 0）的通道来改善。比如，缓冲大小为 100，迭代器在阻塞之前，至少可以从容器获得 100 个元素。如果消费者协程在独立的内核运行，就有可能让协程不会出现阻塞。
 
-由于容器中元素的数量通常是已知的，需要让通道有足够的容量放置所有的元素。这样，迭代器就不会阻塞（尽管消费者协程仍然可能阻塞）。然而，这实际上加倍了迭代容器所需要的内存使用量，所以通道的容量需要限制一下最大值。记录运行时间和性能测试可以帮助你找到最小的缓存容量带来最好的性能。
+### 类型断言： 如何检测和转换接口变量类型
 
-### 使用 select 切换协程
-
-不同的并发执行的协程中获取值可以通过关键字 `select` 来完成，它和 `switch` 控制语句非常相似（章节5.3）也被称作通信开关；它的行为像是“你准备好了吗”的轮询机制；`select` 监听进入通道的数据，也可以是用通道发送值的时候。
+一个接口类型的变量 `varI` 中可以包含任何类型的值，必须有一种方式来检测它的 **动态** 类型，即运行时在变量中存储的值的实际类型。在执行过程中动态类型可能会有所不同，但是它总是可以分配给接口变量本身的类型。通常我们可以使用 **类型断言** 来测试在某个时刻 `varI` 是否包含类型 `T` 的值：
 
 ```go
-select {
-case u:= <- ch1:
-        ...
-case v:= <- ch2:
-        ...
-        ...
-default: // no value ready to be received
-        ...
-}
+v := varI.(T)       // unchecked type assertion
 ```
 
-`default` 语句是可选的；fallthrough 行为，和普通的 switch 相似，是不允许的。在任何一个 case 中执行 `break` 或者 `return`，select 就结束了。
+**varI 必须是一个接口变量**，否则编译器会报错：`invalid type assertion: varI.(T) (non-interface type (type of varI) on left)` 。
 
-`select` 做的就是：选择处理列出的多个通信情况中的一个。
+类型断言可能是无效的，虽然编译器会尽力检查转换是否有效，但是它不可能预见所有的可能性。如果转换在程序运行时失败会导致错误发生。更安全的方式是使用以下形式来进行类型断言：
 
-- 如果都阻塞了，会等待直到其中一个可以处理
-- 如果多个可以处理，随机选择一个
-- 如果没有通道操作可以处理并且写了 `default` 语句，它就会执行：`default` 永远是可运行的（这就是准备好了，可以执行）。
+```go
+if v, ok := varI.(T); ok {  // checked type assertion
+    Process(v)
+    return
+}
+// varI is not of type T
+```
 
-本例子：
+如果转换合法，`v` 是 `varI` 转换到类型 `T` 的值，`ok` 会是 `true`；否则 `v` 是类型 `T` 的零值，`ok` 是 `false`，也没有运行时错误发生。
 
-有 2 个通道 `ch1` 和 `ch2`，三个协程 `pump1()`、`pump2()` 和 `suck()`。这是一个典型的生产者消费者模式。在无限循环中，`ch1` 和 `ch2` 通过 `pump1()` 和 `pump2()` 填充整数；`suck()` 也是在无限循环中轮询输入的，通过 `select` 语句获取 `ch1` 和 `ch2` 的整数并输出。选择哪一个 case 取决于哪一个通道收到了信息。程序在 main 执行 1 秒后结束。
-
-goroutine_select.go
+type_interfaces.go
 
 ```go
 package main
 
 import (
 	"fmt"
-	"time"
+	"math"
 )
 
+type Square struct {
+	side float32
+}
+
+type Circle struct {
+	radius float32
+}
+
+type Shaper interface {
+	Area() float32
+}
+
 func main() {
-	ch1 := make(chan int)
-	ch2 := make(chan int)
+	var areaIntf Shaper
+	sq1 := new(Square)
+	sq1.side = 5
 
-	go pump1(ch1)
-	go pump2(ch2)
-	go suck(ch1, ch2)
-
-	time.Sleep(1e9)
-}
-
-func pump1(ch chan int) {
-	for i := 0; ; i++ {
-		ch <- i * 2
+	areaIntf = sq1
+	// Is Square the type of areaIntf?
+	if t, ok := areaIntf.(*Square); ok {
+		fmt.Printf("The type of areaIntf is: %T\n", t)
+	}
+	if u, ok := areaIntf.(*Circle); ok {
+		fmt.Printf("The type of areaIntf is: %T\n", u)
+	} else {
+		fmt.Println("areaIntf does not contain a variable of type Circle")
 	}
 }
 
-func pump2(ch chan int) {
-	for i := 0; ; i++ {
-		ch <- i + 5
-	}
+func (sq *Square) Area() float32 {
+	return sq.side * sq.side
 }
 
-func suck(ch1, ch2 chan int) {
-	for {
-		select {
-		case v := <-ch1:
-			fmt.Printf("Received on channel 1: %d\n", v)
-		case v := <-ch2:
-			fmt.Printf("Received on channel 2: %d\n", v)
-		}
-	}
+func (ci *Circle) Area() float32 {
+	return ci.radius * ci.radius * math.Pi
 }
 ```
 
->Received on channel 2: 5
->Received on channel 2: 6
->Received on channel 1: 0
->Received on channel 2: 7
->Received on channel 2: 8
->Received on channel 2: 9
->Received on channel 2: 10
->Received on channel 1: 2
->Received on channel 2: 11
->...
->Received on channel 2: 47404
->Received on channel 1: 94346
->Received on channel 1: 94348
+>The type of areaIntf is: *main.Square
+>areaIntf does not contain a variable of type Circle
 
-习惯用法：后台服务模式
+### 类型判断：type-switch
 
-服务通常是是用后台协程中的无限循环实现的，在循环中使用 `select` 获取并处理通道中的数据：
+接口变量的类型也可以使用一种特殊形式的 `switch` 来检测：**type-switch** （下面是示例 11.4 的第二部分）：
 
 ```go
-// Backend goroutine.
-func backend() {
-	for {
-		select {
-		case cmd := <-ch1:
-			// Handle ...
-		case cmd := <-ch2:
-			...
-		case cmd := <-chStop:
-			// stop server
-		}
-	}
+switch t := areaIntf.(type) {
+case *Square:
+	fmt.Printf("Type Square %T with value %v\n", t, t)
+case *Circle:
+	fmt.Printf("Type Circle %T with value %v\n", t, t)
+case nil:
+	fmt.Printf("nil value: nothing to check?\n")
+default:
+	fmt.Printf("Unexpected type %T\n", t)
 }
 ```
 
-在程序的其他地方给通道 `ch1`，`ch2` 发送数据，比如：通道 `stop` 用来清理结束服务程序。
+输出：
 
-另一种方式（但是不太灵活）就是（客户端）在 `chRequest` 上提交请求，后台协程循环这个通道，使用 `switch` 根据请求的行为来分别处理：
+    Type Square *main.Square with value &{5}
 
-```go
-func backend() {
-	for req := range chRequest {
-		switch req.Subjext() {
-			case A1:  // Handle case ...
-			case A2:  // Handle case ...
-			default:
-			  // Handle illegal request ..
-			  // ...
-		}
-	}
-}
-```
+变量 `t` 得到了 `areaIntf` 的值和类型，所有 `case` 语句中列举的类型（`nil` 除外）都必须实现对应的接口（在上例中即 `Shaper`），如果被检测类型没有在 `case` 语句列举的类型中，就会执行 `default` 语句。
 
+可以用 `type-switch` 进行运行时类型分析，但是在 `type-switch` 不允许有 `fallthrough` 。
 
-
-### 通道、超时和计时器（Ticker）
-
-`time` 包中有一些有趣的功能可以和通道组合使用。
-
-其中就包含了 `time.Ticker` 结构体，这个对象以指定的时间间隔重复的向通道 C 发送时间值：
+如果仅仅是测试变量的类型，不用它的值，那么就可以不需要赋值语句，比如：
 
 ```go
-type Ticker struct {
-    C <-chan Time // the channel on which the ticks are delivered.
-    // contains filtered or unexported fields
-    ...
-}
-```
-
-时间间隔的单位是 ns（纳秒，int64），在工厂函数 `time.NewTicker` 中以 `Duration` 类型的参数传入：`func NewTicker(dur) *Ticker`。
-
-在协程周期性的执行一些事情（打印状态日志，输出，计算等等）的时候非常有用。
-
-调用 `Stop()` 使计时器停止，在 `defer` 语句中使用。这些都很好地适应 `select` 语句:
-
-```go
-ticker := time.NewTicker(updateInterval)
-defer ticker.Stop()
+switch areaIntf.(type) {
+case *Square:
+	// TODO
+case *Circle:
+	// TODO
 ...
-select {
-case u:= <-ch1:
-    ...
-case v:= <-ch2:
-    ...
-case <-ticker.C:
-    logState(status) // call some logging function logState
-default: // no value ready to be received
-    ...
+default:
+	// TODO
 }
 ```
 
-`time.Tick()` 函数声明为 `Tick(d Duration) <-chan Time`，当你想返回一个通道而不必关闭它的时候这个函数非常有用：它以 d 为周期给返回的通道发送时间，d 是纳秒数。如果需要像下边的代码一样，限制处理频率（函数 `client.Call()` 是一个 RPC 调用，这里暂不赘述（参见第 [15.9](15.9.md) 节）：
+下面的代码片段展示了一个类型分类函数，它有一个可变长度参数，可以是任意类型的数组，它会根据数组元素的实际类型执行不同的动作：
 
 ```go
-import "time"
-
-rate_per_sec := 10
-var dur Duration = 1e9 / rate_per_sec
-chRate := time.Tick(dur) // a tick every 1/10th of a second
-for req := range requests {
-    <- chRate // rate limit our Service.Method RPC calls
-    go client.Call("Service.Method", req, ...)
+func classifier(items ...interface{}) {
+	for i, x := range items {
+		switch x.(type) {
+		case bool:
+			fmt.Printf("Param #%d is a bool\n", i)
+		case float64:
+			fmt.Printf("Param #%d is a float64\n", i)
+		case int, int64:
+			fmt.Printf("Param #%d is a int\n", i)
+		case nil:
+			fmt.Printf("Param #%d is a nil\n", i)
+		case string:
+			fmt.Printf("Param #%d is a string\n", i)
+		default:
+			fmt.Printf("Param #%d is unknown\n", i)
+		}
+	}
 }
 ```
 
-这样只会按照指定频率处理请求：`chRate` 阻塞了更高的频率。每秒处理的频率可以根据机器负载（和/或）资源的情况而增加或减少。
+可以这样调用此方法：`classifier(13, -14.3, "BELGIUM", complex(1, 2), nil, false)` 。
 
-问题 14.1：扩展上边的代码，思考如何承载周期请求数的暴增（提示：使用带缓冲通道和计时器对象）。
+在处理来自于外部的、类型未知的数据时，比如解析诸如 JSON 或 XML 编码的数据，类型测试和转换会非常有用。
 
-定时器（Timer）结构体看上去和计时器（Ticker）结构体的确很像（构造为 `NewTimer(d Duration)`），但是它只发送一次时间，在 `Dration d` 之后。
+### 测试一个值是否实现了某个接口
 
-还有 `time.After(d)` 函数，声明如下：
+断言中的一个特例：假定 `v` 是一个值，然后我们想测试它是否实现了 `Stringer` 接口，可以这样做：
 
 ```go
-func After(d Duration) <-chan Time
+type Stringer interface {
+    String() string
+}
+
+if sv, ok := v.(Stringer); ok {
+    fmt.Printf("v implements String(): %s\n", sv.String()) // note: sv, not v
+}
 ```
 
-在 `Duration d` 之后，当前时间被发到返回的通道；所以它和 `NewTimer(d).C` 是等价的；它类似 `Tick()`，但是 `After()` 只发送一次时间。下边有个很具体的示例，很好的阐明了 `select` 中 `default` 的作用：
+`Print` 函数就是如此检测类型是否可以打印自身的。
 
-timer_goroutine.go
+接口是一种契约，实现类型必须满足它，它描述了类型的行为，规定类型可以做什么。接口彻底将类型能做什么，以及如何做分离开来，使得相同接口的变量在不同的时刻表现出不同的行为，这就是多态的本质。
+
+编写参数是接口变量的函数，这使得它们更具有一般性。
+
+**使用接口使代码更具有普适性。**
+
+标准库里到处都使用了这个原则，如果对接口概念没有良好的把握，是不可能理解它是如何构建的。
+
+### 使用方法集与接口
+
+methodset2.go
 
 ```go
 package main
 
 import (
 	"fmt"
-	"time"
 )
 
+type List []int
+
+func (l List) Len() int {
+	return len(l)
+}
+
+func (l *List) Append(val int) {
+	*l = append(*l, val)
+}
+
+type Appender interface {
+	Append(int)
+}
+
+func CountInto(a Appender, start, end int) {
+	for i := start; i <= end; i++ {
+		a.Append(i)
+	}
+}
+
+type Lener interface {
+	Len() int
+}
+
+func LongEnough(l Lener) bool {
+	return l.Len()*10 > 42
+}
+
 func main() {
-	tick := time.Tick(1e8)
-	boom := time.After(5e8)
-	for {
-		select {
-		case <-tick:
-			fmt.Println("tick.")
-		case <-boom:
-			fmt.Println("BOOM!")
-			return
-		default:
-			fmt.Println("    .")
-			time.Sleep(5e7)
-		}
+	// A bare value
+	var lst List
+	// compiler error:
+	// cannot use lst (type List) as type Appender in argument to CountInto:
+	//       List does not implement Appender (Append method has pointer receiver)
+	// CountInto(lst, 1, 10)
+	if LongEnough(lst) { // VALID: Identical receiver type
+		fmt.Printf("- lst is long enough\n")
+	}
+
+	// A pointer value
+	plst := new(List)
+	CountInto(plst, 1, 10) // VALID: Identical receiver type
+	if LongEnough(plst) {
+		// VALID: a *List can be dereferenced for the receiver
+		fmt.Printf("- plst is long enough\n")
 	}
 }
 ```
 
->    .
->    .
->tick.
->    .
->    .
->tick.
->    .
->    .
->tick.
->    .
->    .
->tick.
->    .
->    .
->tick.
->BOOM!
+> plst is long enough
 
-**简单超时模式**
+在接口上调用方法时，必须有和方法定义时相同的接收者类型或者是可以根据具体类型 `P` 直接辨识的：
 
-要从通道 `ch` 中接收数据，但是最多等待 1 秒。先创建一个信号通道，然后启动一个 `lambda` 协程，协程在给通道发送数据之前是休眠的：
+- 指针方法可以通过指针调用
+- 值方法可以通过值调用
+- 接收者是值的方法可以通过指针调用，因为指针会首先被解引用
+- 接收者是指针的方法不可以通过值调用，因为存储在接口中的值没有地址
+
+将一个值赋值给一个接口时，编译器会确保所有可能的接口方法都可以在此值上被调用，因此不正确的赋值在编译期就会失败
+
+### 第一个例子： 使用Sorter 接口排序
+
+sort.go
 
 ```go
-timeout := make(chan bool, 1)
-go func() {
-        time.Sleep(1e9) // one second
-        timeout <- true
-}()
+package sort
+
+type Sorter interface {
+	Len() int
+	Less(i, j int) bool
+	Swap(i, j int)
+}
+
+func Sort(data Sorter) {
+	for pass := 1; pass < data.Len(); pass++ {
+		for i := 0; i < data.Len()-pass; i++ {
+			if data.Less(i+1, i) {
+				data.Swap(i, i+1)
+			}
+		}
+	}
+}
+
+func IsSorted(data Sorter) bool {
+	n := data.Len()
+	for i := n - 1; i > 0; i-- {
+		if data.Less(i, i-1) {
+			return false
+		}
+	}
+	return true
+}
+
+// Convenience types for common cases
+type IntArray []int
+
+func (p IntArray) Len() int           { return len(p) }
+func (p IntArray) Less(i, j int) bool { return p[i] < p[j] }
+func (p IntArray) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+type StringArray []string
+
+func (p StringArray) Len() int           { return len(p) }
+func (p StringArray) Less(i, j int) bool { return p[i] < p[j] }
+func (p StringArray) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+// Convenience wrappers for common cases
+func SortInts(a []int)       { Sort(IntArray(a)) }
+func SortStrings(a []string) { Sort(StringArray(a)) }
+
+func IntsAreSorted(a []int) bool       { return IsSorted(IntArray(a)) }
+func StringsAreSorted(a []string) bool { return IsSorted(StringArray(a)) }
 ```
 
-然后使用 `select` 语句接收 `ch` 或者 `timeout` 的数据：如果 `ch` 在 1 秒内没有收到数据，就选择到了 `time` 分支并放弃了 `ch` 的读取。
+sortmain.go
 
 ```go
-select {
-    case <-ch:
-        // a read from ch has occured
-    case <-timeout:
-        // the read from ch has timed out
-        break
+package main
+
+import (
+	"./sort"
+	"fmt"
+)
+
+func ints() {
+	data := []int{74, 59, 238, -784, 9845, 959, 905, 0, 0, 42, 7586, -5467984, 7586}
+	a := sort.IntArray(data) //conversion to type IntArray
+	sort.Sort(a)
+	if !sort.IsSorted(a) {
+		panic("fails")
+	}
+	fmt.Printf("The sorted array is: %v\n", a)
+}
+
+func strings() {
+	data := []string{"monday", "friday", "tuesday", "wednesday", "sunday", "thursday", "", "saturday"}
+	a := sort.StringArray(data)
+	sort.Sort(a)
+	if !sort.IsSorted(a) {
+		panic("fail")
+	}
+	fmt.Printf("The sorted array is: %v\n", a)
+}
+
+type day struct {
+	num       int
+	shortName string
+	longName  string
+}
+
+type dayArray struct {
+	data []*day
+}
+
+func (p *dayArray) Len() int           { return len(p.data) }
+func (p *dayArray) Less(i, j int) bool { return p.data[i].num < p.data[j].num }
+func (p *dayArray) Swap(i, j int)      { p.data[i], p.data[j] = p.data[j], p.data[i] }
+
+func days() {
+	Sunday    := day{0, "SUN", "Sunday"}
+	Monday    := day{1, "MON", "Monday"}
+	Tuesday   := day{2, "TUE", "Tuesday"}
+	Wednesday := day{3, "WED", "Wednesday"}
+	Thursday  := day{4, "THU", "Thursday"}
+	Friday    := day{5, "FRI", "Friday"}
+	Saturday  := day{6, "SAT", "Saturday"}
+	data := []*day{&Tuesday, &Thursday, &Wednesday, &Sunday, &Monday, &Friday, &Saturday}
+	a := dayArray{data}
+	sort.Sort(&a)
+	if !sort.IsSorted(&a) {
+		panic("fail")
+	}
+	for _, d := range data {
+		fmt.Printf("%s ", d.longName)
+	}
+	fmt.Printf("\n")
+}
+
+func main() {
+	ints()
+	strings()
+	days()
 }
 ```
 
-第二种形式：取消耗时很长的同步调用
+>The sorted array is: [-5467984 -784 0 0 42 59 74 238 905 959 7586 7586 9845]
+>The sorted array is: [ friday monday saturday sunday thursday tuesday wednesday]
+>Sunday Monday Tuesday Wednesday Thursday Friday Saturday 
 
-也可以使用 `time.After()` 函数替换 `timeout-channel`。可以在 `select` 中通过 `time.After()` 发送的超时信号来停止协程的执行。以下代码，在 `timeoutNs` 纳秒后执行 `select` 的 `timeout` 分支后，执行`client.Call` 的协程也随之结束，不会给通道 `ch` 返回值：
+
+
+### 第二个例子： 读和写
+
+读和写是软件中很普遍的行为，提起它们会立即想到读写文件、缓存（比如字节或字符串切片）、标准输入输出、标准错误以及网络连接、管道等等，或者读写我们的自定义类型。为了让代码尽可能通用，Go 采取了一致的方式来读写数据。
+
+`io` 包提供了用于读和写的接口 `io.Reader` 和 `io.Writer`：
 
 ```go
-ch := make(chan error, 1)
-go func() { ch <- client.Call("Service.Method", args, &reply) } ()
-select {
-case resp := <-ch
-    // use resp and reply
-case <-time.After(timeoutNs):
-    // call timed out
-    break
+type Reader interface {
+    Read(p []byte) (n int, err error)
+}
+
+type Writer interface {
+    Write(p []byte) (n int, err error)
 }
 ```
 
-注意缓冲大小设置为 1 是必要的，可以避免协程死锁以及确保超时的通道可以被垃圾回收。此外，需要注意在有多个 `case` 符合条件时， `select` 对 `case` 的选择是伪随机的，如果上面的代码稍作修改如下，则 `select` 语句可能不会在定时器超时信号到来时立刻选中 `time.After(timeoutNs)` 对应的 `case`，因此协程可能不会严格按照定时器设置的时间结束。
+只要类型实现了读写接口，提供 `Read` 和 `Write` 方法，就可以从它读取数据，或向它写入数据。一个对象要是可读的，它必须实现 `io.Reader` 接口，这个接口只有一个签名是 `Read(p []byte) (n int, err error)` 的方法，它从调用它的对象上读取数据，并把读到的数据放入参数中的字节切片中，然后返回读取的字节数和一个 `error` 对象，如果没有错误发生返回 `nil`，如果已经到达输入的尾端，会返回 `io.EOF("EOF")`，如果读取的过程中发生了错误，就会返回具体的错误信息。类似地，一个对象要是可写的，它必须实现 `io.Writer` 接口，这个接口也只有一个签名是 `Write(p []byte) (n int, err error)` 的方法，它将指定字节切片中的数据写入调用它的对象里，然后返回实际写入的字节数和一个 `error` 对象（如果没有错误发生就是 `nil`）。
+
+### 空接口
+
+**空接口或者最小接口** 不包含任何方法，它对实现不做任何要求：
 
 ```go
-ch := make(chan int, 1)
-go func() { for { ch <- 1 } } ()
-L:
-for {
-    select {
-    case <-ch:
-        // do something
-    case <-time.After(timeoutNs):
-        // call timed out
-        break L
-    }
+type Any interface {}
+```
+
+任何其他类型都实现了空接口（它不仅仅像 `Java/C#` 中 `Object` 引用类型），`any` 或 `Any` 是空接口一个很好的别名或缩写。
+
+空接口类似 `Java/C#` 中所有类的基类： `Object` 类，二者的目标也很相近。
+
+可以给一个空接口类型的变量 `var val interface {}` 赋任何类型的值。
+
+empty_interface.go
+
+```go
+package main
+import "fmt"
+
+var i = 5
+var str = "ABC"
+
+type Person struct {
+	name string
+	age  int
+}
+
+type Any interface{}
+
+func main() {
+	var val Any
+	val = 5
+	fmt.Printf("val has the value: %v\n", val)
+	val = str
+	fmt.Printf("val has the value: %v\n", val)
+	pers1 := new(Person)
+	pers1.name = "Rob Pike"
+	pers1.age = 55
+	val = pers1
+	fmt.Printf("val has the value: %v\n", val)
+	switch t := val.(type) {
+	case int:
+		fmt.Printf("Type int %T\n", t)
+	case string:
+		fmt.Printf("Type string %T\n", t)
+	case bool:
+		fmt.Printf("Type boolean %T\n", t)
+	case *Person:
+		fmt.Printf("Type pointer to Person %T\n", t)
+	default:
+		fmt.Printf("Unexpected type %T", t)
+	}
 }
 ```
 
-第三种形式：假设程序从多个复制的数据库同时读取。只需要一个答案，需要接收首先到达的答案，`Query` 函数获取数据库的连接切片并请求。并行请求每一个数据库并返回收到的第一个响应：
+>val has the value: 5
+>val has the value: ABC
+>val has the value: &{Rob Pike 55}
+>Type pointer to Person *main.Person
+
+空接口在 `type-switch` 中联合 `lambda` 函数的用法
 
 ```go
-func Query(conns []Conn, query string) Result {
-    ch := make(chan Result, 1)
-    for _, conn := range conns {
-        go func(c Conn) {
-            select {
-            case ch <- c.DoQuery(query):
-            default:
-            }
-        }(conn)
-    }
-    return <- ch
+package main
+
+import "fmt"
+
+type specialString string
+
+var whatIsThis specialString = "hello"
+
+func TypeSwitch() {
+	testFunc := func(any interface{}) {
+		switch v := any.(type) {
+		case bool:
+			fmt.Printf("any %v is a bool type", v)
+		case int:
+			fmt.Printf("any %v is an int type", v)
+		case float32:
+			fmt.Printf("any %v is a float32 type", v)
+		case string:
+			fmt.Printf("any %v is a string type", v)
+		case specialString:
+			fmt.Printf("any %v is a special String!", v)
+		default:
+			fmt.Println("unknown type!")
+		}
+	}
+	testFunc(whatIsThis)
+}
+
+func main() {
+	TypeSwitch()
 }
 ```
 
-再次声明，结果通道 `ch` 必须是带缓冲的：以保证第一个发送进来的数据有地方可以存放，确保放入的首个数据总会成功，所以第一个到达的值会被获取而与执行的顺序无关。正在执行的协程可以总是可以使用 `runtime.Goexit()` 来停止。
+>any hello is a special String!
 
+现在我们知道该怎么做了，就是通过使用空接口。让我们给空接口定一个别名类型 `Element`：`type Element interface{}`
 
-在应用中缓存数据：
-
-应用程序中用到了来自数据库（或者常见的数据存储）的数据时，经常会把数据缓存到内存中，因为从数据库中获取数据的操作代价很高；如果数据库中的值不发生变化就没有问题。但是如果值有变化，我们需要一个机制来周期性的从数据库重新读取这些值：缓存的值就不可用（过期）了，而且我们也不希望用户看到陈旧的数据。
-
-### 协程和恢复（recover）
-
-一个用到 `recover` 的程序（参见第 13.3 节）停掉了服务器内部一个失败的协程而不影响其他协程的工作。
+然后定义一个容器类型的结构体 `Vector`，它包含一个 `Element` 类型元素的切片：
 
 ```go
-func server(workChan <-chan *Work) {
-    for work := range workChan {
-        go safelyDo(work)   // start the goroutine for that work
-    }
-}
-
-func safelyDo(work *Work) {
-    defer func() {
-        if err := recover(); err != nil {
-            log.Printf("Work failed with %s in %v", err, work)
-        }
-    }()
-    do(work)
+type Vector struct {
+	a []Element
 }
 ```
 
-上边的代码，如果 `do(work)` 发生 panic，错误会被记录且协程会退出并释放，而其他协程不受影响。
+`Vector` 里能放任何类型的变量，因为任何类型都实现了空接口，实际上 `Vector` 里放的每个元素可以是不同类型的变量。我们为它定义一个 `At()` 方法用于返回第 `i` 个元素：
 
-因为 `recover` 总是返回 `nil`，除非直接在 `defer` 修饰的函数中调用，`defer` 修饰的代码可以调用那些自身可以使用 `panic` 和 `recover` 避免失败的库例程（库函数）。举例，`safelyDo()` 中 `defer` 修饰的函数可能在调用 `recover` 之前就调用了一个 `logging` 函数，`panicking` 状态不会影响 `logging` 代码的运行。因为加入了恢复模式，函数 `do`（以及它调用的任何东西）可以通过调用 `panic` 来摆脱不好的情况。但是恢复是在 `panicking` 的协程内部的：不能被另外一个协程恢复。
+```go
+func (p *Vector) At(i int) Element {
+	return p.a[i]
+}
+```
 
-### 新旧模型对比：任务和worker
+再定一个 `Set()` 方法用于设置第 `i` 个元素的值：
 
-假设我们需要处理很多任务；一个 worker 处理一项任务。任务可以被定义为一个结构体（具体的细节在这里并不重要）：
+```go
+func (p *Vector) Set(i int, e Element) {
+	p.a[i] = e
+}
+```
+
+`Vector` 中存储的所有元素都是 `Element` 类型，要得到它们的原始类型（unboxing：拆箱）需要用到类型断言。TODO：The compiler rejects assertions guaranteed to fail，类型断言总是在运行时才执行，因此它会产生运行时错误。
+
+
+
+
+
+假设你有一个 `myType` 类型的数据切片，你想将切片中的数据复制到一个空接口切片中，类似：
+
+```go
+var dataSlice []myType = FuncReturnSlice()
+var interfaceSlice []interface{} = dataSlice
+```
+
+可惜不能这么做，编译时会出错：`cannot use dataSlice (type []myType) as type []interface { } in assignment`。
+
+原因是它们俩在内存中的布局是不一样的（参考 [Go wiki](https://github.com/golang/go/wiki/InterfaceSlice)）。
+
+必须使用 `for-range` 语句来一个一个显式地赋值：
+
+```go
+var dataSlice []myType = FuncReturnSlice()
+var interfaceSlice []interface{} = make([]interface{}, len(dataSlice))
+for i, d := range dataSlice {
+    interfaceSlice[i] = d
+}
+```
+
+
+
+**通用类型的节点数据结构**
+
+node_strucures.go
+
+```go
+package main
+
+import "fmt"
+
+type Node struct {
+	le   *Node
+	data interface{}
+	ri   *Node
+}
+
+func NewNode(left, right *Node) *Node {
+	return &Node{left, nil, right}
+}
+
+func (n *Node) SetData(data interface{}) {
+	n.data = data
+}
+
+func main() {
+	root := NewNode(nil, nil)
+	root.SetData("root node")
+	// make child (leaf) nodes:
+	a := NewNode(nil, nil)
+	a.SetData("left node")
+	b := NewNode(nil, nil)
+	b.SetData("right node")
+	root.le = a
+	root.ri = b
+	fmt.Printf("%v\n", root) // Output: &{0x125275f0 root node 0x125275e0}
+}
+```
+
+>&{0x11c04100 root node 0x11c04110}
+
+**从接口道接口**
+
+一个接口的值可以赋值给另一个接口变量，只要底层类型实现了必要的方法。这个转换是在运行时进行检查的，转换失败会导致一个运行时错误：这是 `Go` 语言动态的一面，可以拿它和 `Ruby` 和 `Python` 这些动态语言相比较。
+
+假定：
+
+```go
+var ai AbsInterface // declares method Abs()
+type SqrInterface interface {
+    Sqr() float
+}
+var si SqrInterface
+pp := new(Point) // say *Point implements Abs, Sqr
+var empty interface{}
+```
+
+那么下面的语句和类型断言是合法的：
+
+```go
+empty = pp                // everything satisfies empty
+ai = empty.(AbsInterface) // underlying value pp implements Abs()
+// (runtime failure otherwise)
+si = ai.(SqrInterface) // *Point has Sqr() even though AbsInterface doesn’t
+empty = si             // *Point implements empty set
+// Note: statically checkable so type assertion not necessary.
+```
+
+下面是函数调用的一个例子：
+
+```go
+type myPrintInterface interface {
+	print()
+}
+
+func f3(x myInterface) {
+	x.(myPrintInterface).print() // type assertion to myPrintInterface
+}
+```
+
+`x` 转换为 `myPrintInterface` 类型是完全动态的：只要 `x` 的底层类型（动态类型）定义了 `print` 方法这个调用就可以正常运行（译注：若 `x` 的底层类型未定义 `print` 方法，此处类型断言会导致 `panic`，最佳实践应该为 `if mpi, ok := x.(myPrintInterface); ok { mpi.print() }
+
+### 反射
+
+反射是用程序检查其所拥有的结构，尤其是类型的一种能力；这是元编程的一种形式。反射可以在运行时检查类型和变量，例如它的大小、方法和 `动态`
+的调用这些方法。
+
+变量的最基本信息就是类型和值：反射包的 `Type` 用来表示一个 Go 类型，反射包的 `Value` 为 Go 值提供了反射接口。
+
+两个简单的函数，`reflect.TypeOf` 和 `reflect.ValueOf`，返回被检查对象的类型和值。例如，x 被定义为：`var x float64 = 3.4`，那么 `reflect.TypeOf(x)` 返回 `float64`，`reflect.ValueOf(x)` 返回 `<float64 Value>`
+
+实际上，反射是通过检查一个接口的值，变量首先被转换成空接口。这从下面两个函数签名能够很明显的看出来：
+
+```go
+func TypeOf(i interface{}) Type
+func ValueOf(i interface{}) Value
+```
+
+接口的值包含一个 type 和 value。
+
+reflect.Type 和 reflect.Value 都有许多方法用于检查和操作它们。一个重要的例子是 Value 有一个 Type 方法返回 reflect.Value 的 Type。另一个是 Type 和 Value 都有 Kind 方法返回一个常量来表示类型：Uint、Float64、Slice 等等。
+
+
+
+reflect1.go
+
+```go
+// blog: Laws of Reflection
+package main
+
+import (
+	"fmt"
+	"reflect"
+)
+
+func main() {
+	var x float64 = 3.4
+	fmt.Println("type:", reflect.TypeOf(x))
+	v := reflect.ValueOf(x)
+	fmt.Println("value:", v)
+	fmt.Println("type:", v.Type())
+	fmt.Println("kind:", v.Kind())
+	fmt.Println("value:", v.Float())
+	fmt.Println(v.Interface())
+	fmt.Printf("value is %5.2e\n", v.Interface())
+	y := v.Interface().(float64)
+	fmt.Println(y)
+}
+```
+
+>type: float64
+>
+>value: 3.4
+>
+>type: float64
+>
+>kind: float64
+>
+>value: 3.4
+>
+>3.4
+>
+>value is 3.40e+00
+>
+>3.4
+
+假设我们要把 x 的值改为 3.1415。Value 有一些方法可以完成这个任务，但是必须小心使用：`v.SetFloat(3.1415)`。
+
+这将产生一个错误：`reflect.Value.SetFloat using unaddressable value`。
+
+为什么会这样呢？问题的原因是 v 不是可设置的（这里并不是说值不可寻址）。是否可设置是 Value 的一个属性，并且不是所有的反射值都有这个属性：可以使用 `CanSet()` 方法测试是否可设置。
+
+在例子中我们看到 `v.CanSet()` 返回 false： `settability of v: false`
+
+当 `v := reflect.ValueOf(x)` 函数通过传递一个 x 拷贝创建了 v，那么 v 的改变并不能更改原始的 x。要想 v 的更改能作用到 x，那就必须传递 x 的地址 `v = reflect.ValueOf(&x)`。
+
+reflect2.go
+
+```go
+package main
+
+import (
+	"fmt"
+	"reflect"
+)
+
+func main() {
+	var x float64 = 3.4
+	v := reflect.ValueOf(x)
+	// setting a value:
+	// v.SetFloat(3.1415) // Error: will panic: reflect.Value.SetFloat using unaddressable value
+	fmt.Println("settability of v:", v.CanSet())
+	v = reflect.ValueOf(&x) // Note: take the address of x.
+	fmt.Println("type of v:", v.Type())
+	fmt.Println("settability of v:", v.CanSet())
+	v = v.Elem()
+	fmt.Println("The Elem of v is: ", v)
+	fmt.Println("settability of v:", v.CanSet())
+	v.SetFloat(3.1415) // this works!
+	fmt.Println(v.Interface())
+	fmt.Println(v)
+}
+```
+
+>settability of v: false
+>type of v: *float64
+>settability of v: false
+>The Elem of v is:  <float64 Value>
+>settability of v: true
+>3.1415
+><float64 Value>
+
+有些时候需要反射一个结构类型。`NumField()` 方法返回结构内的字段数量；通过一个 for 循环用索引取得每个字段的值 `Field(i)`。
+
+我们同样能够调用签名在结构上的方法，例如，使用索引 n 来调用：`Method(n).Call(nil)`。
+
+``` go
+package main
+
+import (
+	"fmt"
+	"reflect"
+)
+
+type NotknownType struct {
+	s1, s2, s3 string
+}
+
+func (n NotknownType) String() string {
+	return n.s1 + " - " + n.s2 + " - " + n.s3
+}
+
+// variable to investigate:
+var secret interface{} = NotknownType{"Ada", "Go", "Oberon"}
+
+func main() {
+	value := reflect.ValueOf(secret) // <main.NotknownType Value>
+	typ := reflect.TypeOf(secret)    // main.NotknownType
+	// alternative:
+	// typ := value.Type()  // main.NotknownType
+	fmt.Println(typ)
+	knd := value.Kind() // struct
+	fmt.Println(knd)
+
+	// iterate through the fields of the struct:
+	for i := 0; i < value.NumField(); i++ {
+		fmt.Printf("Field %d: %v\n", i, value.Field(i))
+		// error: panic: reflect.Value.SetString using value obtained using unexported field
+		// value.Field(i).SetString("C#")
+	}
+
+	// call the first method, which is String():
+	results := value.Method(0).Call(nil)
+	fmt.Println(results) // [Ada - Go - Oberon]
+}
+```
+
+>main.NotknownType
+>
+>struct
+>
+>Field 0: Ada
+>
+>Field 1: Go
+>
+>Field 2: Oberon
+>
+>[Ada - Go - Oberon]
+
+但是如果尝试更改一个值，会得到一个错误：
+
+```
+panic: reflect.Value.SetString using value obtained using unexported field
+```
+
+这是因为结构中只有被导出字段（首字母大写）才是可设置的；来看下面的例子：
+
+```go
+package main
+
+import (
+	"fmt"
+	"reflect"
+)
+
+type T struct {
+	A int
+	B string
+}
+
+func main() {
+	t := T{23, "skidoo"}
+	s := reflect.ValueOf(&t).Elem()
+	typeOfT := s.Type()
+	for i := 0; i < s.NumField(); i++ {
+		f := s.Field(i)
+		fmt.Printf("%d: %s %s = %v\n", i,
+			typeOfT.Field(i).Name, f.Type(), f.Interface())
+	}
+	s.Field(0).SetInt(77)
+	s.Field(1).SetString("Sunset Strip")
+	fmt.Println("t is now", t)
+}
+```
+
+>0: A int = 23
+>1: B string = skidoo
+>t is now {77 Sunset Strip}
+
+### Printf 和 反射
+
+在 Go 语言的标准库中，前几节所述的反射的功能被大量地使用。举个例子，fmt 包中的 Printf（以及其他格式化输出函数）都会使用反射来分析它的 `...` 参数。
+
+Printf 的函数声明为：
+
+```go
+func Printf(format string, args ... interface{}) (n int, err error)
+```
+
+Printf 中的 `...` 参数为空接口类型。Printf 使用反射包来解析这个参数列表。所以，Printf 能够知道它每个参数的类型。因此格式化字符串中只有 %d 而没有 %u 和 %ld，因为它知道这个参数是 unsigned 还是 long。这也是为什么 Print 和 Println 在没有格式字符串的情况下还能如此漂亮地输出。
+
+我们实现了一个简单的通用输出函数。其中使用了 type-switch 来推导参数类型，并根据类型来输出每个参数的值
+
+print.go
+
+```go
+package main
+
+import (
+	"os"
+	"strconv"
+)
+
+type Stringer interface {
+	String() string
+}
+
+type Celsius float64
+
+func (c Celsius) String() string {
+	return strconv.FormatFloat(float64(c),'f', 1, 64) + " °C"
+}
+
+type Day int
+
+var dayName = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+
+func (day Day) String() string {
+	return dayName[day]
+}
+
+func print(args ...interface{}) {
+	for i, arg := range args {
+		if i > 0 {os.Stdout.WriteString(" ")}
+		switch a := arg.(type) { // type switch
+			case Stringer:	os.Stdout.WriteString(a.String())
+			case int:		os.Stdout.WriteString(strconv.Itoa(a))
+			case string:	os.Stdout.WriteString(a)
+			// more types
+			default:		os.Stdout.WriteString("???")
+		}
+	}
+}
+
+func main() {
+	print(Day(1), "was", Celsius(18.36))  // Tuesday was 18.4 °C
+}
+```
+
+>Tuesday was 18.4 °C
+
+Go 没有类：数据（结构体或更一般的类型）和方法是一种松耦合的正交关系。
+
+Go 中的接口跟 Java/C# 类似：都是必须提供一个指定方法集的实现。但是更加灵活通用：任何提供了接口方法实现代码的类型都隐式地实现了该接口，而不用显式地声明。
+
+
+
+### 接口与动态类型
+
+Go 没有类：数据（结构体或更一般的类型）和方法是一种松耦合的正交关系。
+
+Go 中的接口跟 Java/C# 类似：都是必须提供一个指定方法集的实现。但是更加灵活通用：任何提供了接口方法实现代码的类型都隐式地实现了该接口，而不用显式地声明。
+
+接收一个（或多个）接口类型作为参数的函数，其**实参**可以是任何实现了该接口的类型的变量。 `实现了某个接口的类型可以被传给任何以此接口为参数的函数` 。
+
+duck_dance.go
+
+```go
+package main
+
+import "fmt"
+
+type IDuck interface {
+	Quack()
+	Walk()
+}
+
+func DuckDance(duck IDuck) {
+	for i := 1; i <= 3; i++ {
+		duck.Quack()
+		duck.Walk()
+	}
+}
+
+type Bird struct {
+	// ...
+}
+
+func (b *Bird) Quack() {
+	fmt.Println("I am quacking!")
+}
+
+func (b *Bird) Walk()  {
+	fmt.Println("I am walking!")
+}
+
+func main() {
+	b := new(Bird)
+	DuckDance(b)
+}
+```
+
+>I am quacking!
+>
+>I am walking!
+>
+>I am quacking!
+>
+>I am walking!
+>
+>I am quacking!
+>
+>I am walking!
+>
+>Go 的实现与此相反，通常需要编译器静态检查的支持：当变量被赋值给一个接口类型的变量时，编译器会检查其是否实现了该接口的所有函数。如果方法调用作用于像 `interface{}` 这样的“泛型”上，你可以通过类型断言（参见 11.3 节）来检查变量是否实现了相应接口。
+
+例如，你用不同的类型表示 XML 输出流中的不同实体。然后我们为 XML 定义一个如下的“写”接口（甚至可以把它定义为私有接口）：
+
+```go
+type xmlWriter interface {
+	WriteXML(w io.Writer) error
+}
+```
+
+现在我们可以实现适用于该流类型的任何变量的 `StreamXML` 函数，并用类型断言检查传入的变量是否实现了该接口；如果没有，我们就调用内建的 `encodeToXML` 来完成相应工作：
+
+```go
+// Exported XML streaming function.
+func StreamXML(v interface{}, w io.Writer) error {
+	if xw, ok := v.(xmlWriter); ok {
+		// It’s an  xmlWriter, use method of asserted type.
+		return xw.WriteXML(w)
+	}
+	// No implementation, so we have to use our own function (with perhaps reflection):
+	return encodeToXML(v, w)
+}
+
+// Internal XML encoding function.
+func encodeToXML(v interface{}, w io.Writer) error {
+	// ...
+}
+```
+
+Go 在这里用了和 `gob` 相同的机制：定义了两个接口 `GobEncoder` 和 `GobDecoder`。这样就允许类型自己实现从流编解码的具体方式；如果没有实现就使用标准的反射方式。
+
+`提取接口` 是非常有用的设计模式，可以减少需要的类型和方法数量，而且不需要像传统的基于类的面向对象语言那样维护整个的类层次结构。
+
+Go 接口可以让开发者找出自己写的程序中的类型。假设有一些拥有共同行为的对象，并且开发者想要抽象出这些行为，这时就可以创建一个接口来使用。
+
+muti_interfaces_poly.go
+
+```go
+//multi_interfaces_poly.go
+package main
+
+import "fmt"
+
+type Shaper interface {
+	Area() float32
+}
+
+type TopologicalGenus interface {
+	Rank() int
+}
+
+type Square struct {
+	side float32
+}
+
+func (sq *Square) Area() float32 {
+	return sq.side * sq.side
+}
+
+func (sq *Square) Rank() int {
+	return 1
+}
+
+type Rectangle struct {
+	length, width float32
+}
+
+func (r Rectangle) Area() float32 {
+	return r.length * r.width
+}
+
+func (r Rectangle) Rank() int {
+	return 2
+}
+
+func main() {
+	r := Rectangle{5, 3} // Area() of Rectangle needs a value
+	q := &Square{5}      // Area() of Square needs a pointer
+	shapes := []Shaper{r, q}
+	fmt.Println("Looping through shapes for area ...")
+	for n, _ := range shapes {
+		fmt.Println("Shape details: ", shapes[n])
+		fmt.Println("Area of this shape is: ", shapes[n].Area())
+	}
+	topgen := []TopologicalGenus{r, q}
+	fmt.Println("Looping through topgen for rank ...")
+	for n, _ := range topgen {
+		fmt.Println("Shape details: ", topgen[n])
+		fmt.Println("Topological Genus of this shape is: ", topgen[n].Rank())
+	}
+}
+```
+
+>Looping through shapes for area ...
+>
+>Shape details:  {5 3}
+>
+>Area of this shape is:  15
+>
+>Shape details:  &{5}
+>
+>Area of this shape is:  25
+>
+>Looping through topgen for rank ...
+>
+>Shape details:  {5 3}
+>
+>Topological Genus of this shape is:  2
+>
+>Shape details:  &{5}
+>
+>Topological Genus of this shape is:  1
+
+**空接口和函数重载**
+
+我们看到函数重载是不被允许的。在 Go 语言中函数重载可以用可变参数 `...T` 作为函数最后一个参数来实现（参见 6.3 节）。如果我们把 T 换为空接口，那么可以知道任何类型的变量都是满足 T (空接口）类型的，这样就允许我们传递任何数量任何类型的参数给函数，即重载的实际含义。
+
+函数 `fmt.Printf` 就是这样做的：
+
+```go
+fmt.Printf(format string, a ...interface{}) (n int, errno error)
+```
+
+这个函数通过枚举 `slice` 类型的实参动态确定所有参数的类型，并查看每个类型是否实现了 `String()` 方法，如果是就用于产生输出信息。我们可以回到 11.10 节查看这些细节。
+
+**接口的继承**
+
+当一个类型包含（内嵌）另一个类型（实现了一个或多个接口）的指针时，这个类型就可以使用（另一个类型）所有的接口方法。
+
+例如：
 
 ```go
 type Task struct {
-    // some state
+	Command string
+	*log.Logger
 }
 ```
 
-旧模式：使用共享内存进行同步
-
-由各个任务组成的任务池共享内存；为了同步各个 worker 以及避免资源竞争，我们需要对任务池进行加锁保护：
+这个类型的工厂方法像这样：
 
 ```go
-    type Pool struct {
-        Mu      sync.Mutex
-        Tasks   []*Task
-    }
-```
-
-sync.Mutex（[参见9.3](09.3.md)）是互斥锁：它用来在代码中保护临界区资源：同一时间只有一个 go 协程（goroutine）可以进入该临界区。如果出现了同一时间多个 go 协程都进入了该临界区，则会产生竞争：Pool 结构就不能保证被正确更新。在传统的模式中（经典的面向对象的语言中应用得比较多，比如 C++，JAVA，C#），worker 代码可能这样写：
-
-```go
-func Worker(pool *Pool) {
-    for {
-        pool.Mu.Lock()
-        // begin critical section:
-        task := pool.Tasks[0]        // take the first task
-        pool.Tasks = pool.Tasks[1:]  // update the pool of tasks
-        // end critical section
-        pool.Mu.Unlock()
-        process(task)
-    }
+func NewTask(command string, logger *log.Logger) *Task {
+	return &Task{command, logger}
 }
 ```
 
-这些 worker 有许多都可以并发执行；他们可以在 go 协程中启动。一个 worker 先将 pool 锁定，从 pool 获取第一项任务，再解锁和处理任务。加锁保证了同一时间只有一个 go 协程可以进入到 pool 中：一项任务有且只能被赋予一个 worker 。如果不加锁，则工作协程可能会在 `task:=pool.Tasks[0]` 发生切换，导致 `pool.Tasks=pool.Tasks[1:]` 结果异常：一些 worker 获取不到任务，而一些任务可能被多个 worker 得到。加锁实现同步的方式在工作协程比较少时可以工作得很好，但是当工作协程数量很大，任务量也很多时，处理效率将会因为频繁的加锁/解锁开销而降低。当工作协程数增加到一个阈值时，程序效率会急剧下降，这就成为了瓶颈。
-
-这些 worker 有许多都可以并发执行；他们可以在 go 协程中启动。一个 worker 先将 pool 锁定，从 pool 获取第一项任务，再解锁和处理任务。加锁保证了同一时间只有一个 go 协程可以进入到 pool 中：一项任务有且只能被赋予一个 worker 。如果不加锁，则工作协程可能会在 `task:=pool.Tasks[0]` 发生切换，导致 `pool.Tasks=pool.Tasks[1:]` 结果异常：一些 worker 获取不到任务，而一些任务可能被多个 worker 得到。加锁实现同步的方式在工作协程比较少时可以工作得很好，但是当工作协程数量很大，任务量也很多时，处理效率将会因为频繁的加锁/解锁开销而降低。当工作协程数增加到一个阈值时，程序效率会急剧下降，这就成为了瓶颈。
-
-新模式：使用通道
-
-使用通道进行同步：使用一个通道接受需要处理的任务，一个通道接受处理完成的任务（及其结果）。worker 在协程中启动，其数量 N 应该根据任务数量进行调整。
-
-主线程扮演着 Master 节点角色，可能写成如下形式：
+当 `log.Logger` 实现了 `Log()` 方法后，Task 的实例 task 就可以调用该方法：
 
 ```go
-    func main() {
-        pending, done := make(chan *Task), make(chan *Task)
-        go sendWork(pending)       // put tasks with work on the channel
-        for i := 0; i < N; i++ {   // start N goroutines to do work
-            go Worker(pending, done)
-        }
-        consumeWork(done)          // continue with the processed tasks
-    }
+task.Log()
 ```
 
-worker 的逻辑比较简单：从 pending 通道拿任务，处理后将其放到done通道中：
+类型可以通过继承多个接口来提供像 `多重继承` 一样的特性：
 
 ```go
-    func Worker(in, out chan *Task) {
-        for {
-            t := <-in
-            process(t)
-            out <- t
-        }
-    }
+type ReaderWriter struct {
+	*io.Reader
+	*io.Writer
+}
 ```
 
-这里并不使用锁：从通道得到新任务的过程没有任何竞争。随着任务数量增加，worker 数量也应该相应增加，同时性能并不会像第一种方式那样下降明显。在 pending 通道中存在一份任务的拷贝，第一个 worker 从 pending 通道中获得第一个任务并进行处理，这里并不存在竞争（对一个通道读数据和写数据的整个过程是原子性的：参见 [14.2.2](14.2.md)）。某一个任务会在哪一个 worker 中被执行是不可知的，反过来也是。worker 数量的增多也会增加通信的开销，这会对性能有轻微的影响。
+上面概述的原理被应用于整个 Go 包，多态用得越多，代码就相对越少（参见 12.8 节）。这被认为是 Go 编程中的重要的最佳实践。
 
-从这个简单的例子中可能很难看出第二种模式的优势，但含有复杂锁运用的程序不仅在编写上显得困难，也不容易编写正确，使用第二种模式的话，就无需考虑这么复杂的东西了。
 
-因此，第二种模式对比第一种模式而言，不仅性能是一个主要优势，而且还有个更大的优势：代码显得更清晰、更优雅。一个更符合 go 语言习惯的 worker 写法：
 
-**IDIOM: Use an in- and out-channel instead of locking**
+
+
+### 总结：Go中的面向对象
+
+我们总结一下前面看到的：Go 没有类，而是松耦合的类型、方法对接口的实现。
+
+OO 语言最重要的三个方面分别是：封装，继承和多态，在 Go 中它们是怎样表现的呢？
+
+- 封装（数据隐藏）：和别的 OO 语言有 4 个或更多的访问层次相比，Go 把它简化为了 2 层（参见 4.2 节的可见性规则）:
+
+  1）包范围内的：通过标识符首字母小写，`对象` 只在它所在的包内可见
+
+  2）可导出的：通过标识符首字母大写，`对象` 对所在包以外也可见
+
+类型只拥有自己所在包中定义的方法。
+
+- 继承：用组合实现：内嵌一个（或多个）包含想要的行为（字段和方法）的类型；多重继承可以通过内嵌多个类型实现
+- 多态：用接口实现：某个类型的实例可以赋给它所实现的任意接口类型的变量。类型和接口是松耦合的，并且多重继承可以通过实现多个接口实现。Go 接口不是 Java 和 C# 接口的变体，而且接口间是不相关的，并且是大规模编程和可适应的演进型设计的关键。
+
+
+
+### 结构体，集合和高阶函数
+
+通常你在应用中定义了一个结构体，那么你也可能需要这个结构体的（指针）对象集合，比如：
 
 ```go
-    func Worker(in, out chan *Task) {
-        for {
-            t := <-in
-            process(t)
-            out <- t
-        }
-    }
+type Any interface{}
+type Car struct {
+	Model        string
+	Manufacturer string
+	BuildYear    int
+	// ...
+}
+
+type Cars []*Car
 ```
 
-通道是一个较新的概念，本节我们着重强调了在 go 协程里通道的使用，但这并不意味着经典的锁方法就不能使用。go 语言让你可以根据实际问题进行选择：创建一个优雅、简单、可读性强、在大多数场景性能表现都能很好的方案。如果你的问题适合使用锁，也不要忌讳使用它。go语言注重实用，什么方式最能解决你的问题就用什么方式，而不是强迫你使用一种编码风格。下面列出一个普遍的经验法则：
+然后我们就可以使用高阶函数，实际上也就是把函数作为定义所需方法（其他函数）的参数，例如：
 
-* 使用锁的情景：
-  - 访问共享数据结构中的缓存信息
-  - 保存应用程序上下文和状态信息数据
-
-* 使用通道的情景：
-  - 与异步操作的结果进行交互
-  - 分发任务
-  - 传递数据所有权
-
-当你发现你的锁使用规则变得很复杂时，可以反省使用通道会不会使问题变得简单些。
-
-### 惰性生成器的实现
-
-生成器是指当被调用时返回一个序列中下一个值的函数，例如：
+1）定义一个通用的 `Process()` 函数，它接收一个作用于每一辆 car 的 f 函数作参数：
 
 ```go
-    generateInteger() => 0
-    generateInteger() => 1
-    generateInteger() => 2
-    ....
+// Process all cars with the given function f:
+func (cs Cars) Process(f func(car *Car)) {
+	for _, c := range cs {
+		f(c)
+	}
+}
 ```
 
-生成器每次返回的是序列中下一个值而非整个序列；这种特性也称之为惰性求值：只在你需要时进行求值，同时保留相关变量资源（内存和 CPU）：这是一项在需要时对表达式进行求值的技术。例如，生成一个无限数量的偶数序列：要产生这样一个序列并且在一个一个的使用可能会很困难，而且内存会溢出！但是一个含有通道和 go 协程的函数能轻易实现这个需求。
-
-我们实现了一个使用 int 型通道来实现的生成器。通道被命名为 `yield` 和 `resume` ，这些词经常在协程代码中使用。
-
-
-
-lazy_evaluation.go
+2）在上面的基础上，实现一个查找函数来获取子集合，并在 `Process()` 中传入一个闭包执行（这样就可以访问局部切片 `cars`）：
 
 ```go
+// Find all cars matching a given criteria.
+func (cs Cars) FindAll(f func(car *Car) bool) Cars {
+
+	cars := make([]*Car, 0)
+	cs.Process(func(c *Car) {
+		if f(c) {
+			cars = append(cars, c)
+		}
+	})
+	return cars
+}
+```
+
+3）实现 Map 功能，产出除 car 对象以外的东西：
+
+```go
+// Process cars and create new data.
+func (cs Cars) Map(f func(car *Car) Any) []Any {
+	result := make([]Any, 0)
+	ix := 0
+	cs.Process(func(c *Car) {
+		result[ix] = f(c)
+		ix++
+	})
+	return result
+}
+```
+
+现在我们可以定义下面这样的具体查询：
+
+```go
+allNewBMWs := allCars.FindAll(func(car *Car) bool {
+	return (car.Manufacturer == "BMW") && (car.BuildYear > 2010)
+})
+```
+
+4）我们也可以根据参数返回不同的函数。也许我们想根据不同的厂商添加汽车到不同的集合，但是这（这种映射关系）可能会是会改变的。所以我们可以定义一个函数来产生特定的添加函数和 map 集：
+
+```go
+func MakeSortedAppender(manufacturers []string)(func(car *Car),map[string]Cars) {
+	// Prepare maps of sorted cars.
+	sortedCars := make(map[string]Cars)
+	for _, m := range manufacturers {
+		sortedCars[m] = make([]*Car, 0)
+	}
+	sortedCars["Default"] = make([]*Car, 0)
+	// Prepare appender function:
+	appender := func(c *Car) {
+		if _, ok := sortedCars[c.Manufacturer]; ok {
+			sortedCars[c.Manufacturer] = append(sortedCars[c.Manufacturer], c)
+		} else {
+			sortedCars["Default"] = append(sortedCars["Default"], c)
+		}
+
+	}
+	return appender, sortedCars
+}
+```
+
+现在我们可以用它把汽车分类为独立的集合，像这样：
+
+```go
+manufacturers := []string{"Ford", "Aston Martin", "Land Rover", "BMW", "Jaguar"}
+sortedAppender, sortedCars := MakeSortedAppender(manufacturers)
+allUnsortedCars.Process(sortedAppender)
+BMWCount := len(sortedCars["BMW"])
+```
+
+我们让这些代码在下面的程序 cars.go 中执行：
+
+示例 11.18 [cars.go](examples/chapter_11/cars.go)：
+
+```go
+// cars.go
 package main
 
 import (
-    "fmt"
-)
-
-var resume chan int
-
-func integers() chan int {
-    yield := make(chan int)
-    count := 0
-    go func() {
-        for {
-            yield <- count
-            count++
-        }
-    }()
-    return yield
-}
-
-func generateInteger() int {
-    return <-resume
-}
-
-func main() {
-    resume = integers()
-    fmt.Println(generateInteger())  //=> 0
-    fmt.Println(generateInteger())  //=> 1
-    fmt.Println(generateInteger())  //=> 2    
-}
-```
-
-有一个细微的区别是从通道读取的值可能会是稍早前产生的，并不是在程序被调用时生成的。如果确实需要这样的行为，就得实现一个请求响应机制。当生成器生成数据的过程是计算密集型且各个结果的顺序并不重要时，那么就可以将生成器放入到 go 协程实现并行化。但是得小心，使用大量的 go 协程的开销可能会超过带来的性能增益。
-
-这些原则可以概括为：通过巧妙地使用空接口、闭包和高阶函数，我们能实现一个通用的惰性生产器的工厂函数 `BuildLazyEvaluator`（这个应该放在一个工具包中实现）。工厂函数需要一个函数和一个初始状态作为输入参数，返回一个无参、返回值是生成序列的函数。传入的函数需要计算出下一个返回值以及下一个状态参数。在工厂函数中，创建一个通道和无限循环的 go 协程。返回值被放到了该通道中，返回函数稍后被调用时从该通道中取得该返回值。每当取得一个值时，下一个值即被计算。在下面的例子中，定义了一个 `evenFunc` 函数，其是一个惰性生成函数：在 main 函数中，我们创建了前 10 个偶数，每个都是通过调用 `even()` 函数取得下一个值的。为此，我们需要在 `BuildLazyIntEvaluator` 函数中具体化我们的生成函数，然后我们能够基于此做出定义。
-
-general_lazy_evalution1.go
-
-```go
-package main
-
-import (
-    "fmt"
+	"fmt"
 )
 
 type Any interface{}
-type EvalFunc func(Any) (Any, Any)
+type Car struct {
+	Model        string
+	Manufacturer string
+	BuildYear    int
+	// ...
+}
+type Cars []*Car
 
 func main() {
-    evenFunc := func(state Any) (Any, Any) {
-        os := state.(int)
-        ns := os + 2
-        return os, ns
-    }
-    
-    even := BuildLazyIntEvaluator(evenFunc, 0)
-    
-    for i := 0; i < 10; i++ {
-        fmt.Printf("%vth even: %v\n", i, even())
-    }
+	// make some cars:
+	ford := &Car{"Fiesta", "Ford", 2008}
+	bmw := &Car{"XL 450", "BMW", 2011}
+	merc := &Car{"D600", "Mercedes", 2009}
+	bmw2 := &Car{"X 800", "BMW", 2008}
+	// query:
+	allCars := Cars([]*Car{ford, bmw, merc, bmw2})
+	allNewBMWs := allCars.FindAll(func(car *Car) bool {
+		return (car.Manufacturer == "BMW") && (car.BuildYear > 2010)
+	})
+	fmt.Println("AllCars: ", allCars)
+	fmt.Println("New BMWs: ", allNewBMWs)
+	//
+	manufacturers := []string{"Ford", "Aston Martin", "Land Rover", "BMW", "Jaguar"}
+	sortedAppender, sortedCars := MakeSortedAppender(manufacturers)
+	allCars.Process(sortedAppender)
+	fmt.Println("Map sortedCars: ", sortedCars)
+	BMWCount := len(sortedCars["BMW"])
+	fmt.Println("We have ", BMWCount, " BMWs")
 }
 
-func BuildLazyEvaluator(evalFunc EvalFunc, initState Any) func() Any {
-    retValChan := make(chan Any)
-    loopFunc := func() {
-        var actState Any = initState
-        var retVal Any
-        for {
-            retVal, actState = evalFunc(actState)
-            retValChan <- retVal
-        }
-    }
-    retFunc := func() Any {
-        return <- retValChan
-    }
-    go loopFunc()
-    return retFunc
+// Process all cars with the given function f:
+func (cs Cars) Process(f func(car *Car)) {
+	for _, c := range cs {
+		f(c)
+	}
 }
 
-func BuildLazyIntEvaluator(evalFunc EvalFunc, initState Any) func() int {
-    ef := BuildLazyEvaluator(evalFunc, initState)
-    return func() int {
-        return ef().(int)
-    }
+// Find all cars matching a given criteria.
+func (cs Cars) FindAll(f func(car *Car) bool) Cars {
+	cars := make([]*Car, 0)
+
+	cs.Process(func(c *Car) {
+		if f(c) {
+			cars = append(cars, c)
+		}
+	})
+	return cars
 }
-```
 
->0th even: 0
->1th even: 2
->2th even: 4
->3th even: 6
->4th even: 8
->5th even: 10
->6th even: 12
->7th even: 14
->8th even: 16
->9th even: 18
-
-### 实现 Futures 模式
-
-所谓 Futures 就是指：有时候在你使用某一个值之前需要先对其进行计算。这种情况下，你就可以在另一个处理器上进行该值的计算，到使用时，该值就已经计算完毕了。
-
-Futures 模式通过闭包和通道可以很容易实现，类似于生成器，不同地方在于 Futures 需要返回一个值。
-
-参考条目文献给出了一个很精彩的例子：假设我们有一个矩阵类型，我们需要计算两个矩阵 A 和 B 乘积的逆，首先我们通过函数 `Inverse(M)` 分别对其进行求逆运算，再将结果相乘。如下函数 `InverseProduct()` 实现了如上过程：
-
-```go
-func InverseProduct(a Matrix, b Matrix) {
-    a_inv := Inverse(a)
-    b_inv := Inverse(b)
-    return Product(a_inv, b_inv)
+// Process cars and create new data.
+func (cs Cars) Map(f func(car *Car) Any) []Any {
+	result := make([]Any, len(cs))
+	ix := 0
+	cs.Process(func(c *Car) {
+		result[ix] = f(c)
+		ix++
+	})
+	return result
 }
-```
 
-在这个例子中，a 和 b 的求逆矩阵需要先被计算。那么为什么在计算 b 的逆矩阵时，需要等待 a 的逆计算完成呢？显然不必要，这两个求逆运算其实可以并行执行的。换句话说，调用 `Product` 函数只需要等到 `a_inv` 和 `b_inv` 的计算完成。如下代码实现了并行计算方式：
+func MakeSortedAppender(manufacturers []string) (func(car *Car), map[string]Cars) {
+	// Prepare maps of sorted cars.
+	sortedCars := make(map[string]Cars)
 
-```go
-func InverseProduct(a Matrix, b Matrix) {
-    a_inv_future := InverseFuture(a)   // start as a goroutine
-    b_inv_future := InverseFuture(b)   // start as a goroutine
-    a_inv := <-a_inv_future
-    b_inv := <-b_inv_future
-    return Product(a_inv, b_inv)
-}
-```
+	for _, m := range manufacturers {
+		sortedCars[m] = make([]*Car, 0)
+	}
+	sortedCars["Default"] = make([]*Car, 0)
 
-`InverseFuture` 函数以 `goroutine` 的形式起了一个闭包，该闭包会将矩阵求逆结果放入到 future 通道中：
-
-```go
-func InverseFuture(a Matrix) chan Matrix {
-    future := make(chan Matrix)
-    go func() {
-        future <- Inverse(a)
-    }()
-    return future
-}
-```
-
-当开发一个计算密集型库时，使用 Futures 模式设计 API 接口是很有意义的。在你的包使用 Futures 模式，且能保持友好的 API 接口。此外，Futures 可以通过一个异步的 API 暴露出来。这样你可以以最小的成本将包中的并行计算移到用户代码中。
-
-### 复用
-
-客户端-服务器应用正是 goroutines 和 channels 的亮点所在。
-
-客户端（Client）可以是运行在任意设备上的任意程序，它会按需发送请求（request）至服务器。服务器（Server）接收到这个请求后开始相应的工作，然后再将响应（response）返回给客户端。典型情况下一般是多个客户端（即多个请求）对应一个（或少量）服务器。例如我们日常使用的浏览器客户端，其功能就是向服务器请求网页。而 Web 服务器则会向浏览器响应网页数据。
-
-使用 Go 的服务器通常会在协程中执行向客户端的响应，故而会对每一个客户端请求启动一个协程。一个常用的操作方法是客户端请求自身中包含一个通道，而服务器则向这个通道发送响应。
-
-例如下面这个 `Request` 结构，其中内嵌了一个 `replyc` 通道。
-
-```go
-type Request struct {
-    a, b      int    
-    replyc    chan int // reply channel inside the Request
-}
-```
-
-或者更通俗的：
-
-```go
-type Reply struct{...}
-type Request struct{
-    arg1, arg2, arg3 some_type
-    replyc chan *Reply
-}
-```
-
-接下来先使用简单的形式,服务器会为每一个请求启动一个协程并在其中执行 `run()` 函数，此举会将类型为 `binOp` 的 `op` 操作返回的 int 值发送到 `replyc` 通道。
-
-````go
-type binOp func(a, b int) int
-
-func run(op binOp, req *Request) {
-    req.replyc <- op(req.a, req.b)
-}
-````
-
-`server` 协程会无限循环以从 `chan *Request` 接收请求，并且为了避免被长时间操作所堵塞，它将为每一个请求启动一个协程来做具体的工作：
-
-```go
-func server(op binOp, service chan *Request) {
-    for {
-        req := <-service; // requests arrive here  
-        // start goroutine for request:        
-        go run(op, req);  // don’t wait for op to complete    
-    }
-}
-```
-
-`server` 本身则是以协程的方式在 `startServer` 函数中启动：
-
-```go
-func startServer(op binOp) chan *Request {
-    reqChan := make(chan *Request);
-    go server(op, reqChan);
-    return reqChan;
-}
-```
-
-`startServer` 则会在 `main` 协程中被调用。
-
-在以下测试例子中，100 个请求会被发送到服务器，只有它们全部被送达后我们才会按相反的顺序检查响应：
-
-```go
-func main() {
-    adder := startServer(func(a, b int) int { return a + b })
-    const N = 100
-    var reqs [N]Request
-    for i := 0; i < N; i++ {
-        req := &reqs[i]
-        req.a = i
-        req.b = i + N
-        req.replyc = make(chan int)
-        adder <- req  // adder is a channel of requests
-    }
-    // checks:
-    for i := N - 1; i >= 0; i-- {
-        // doesn’t matter what order
-        if <-reqs[i].replyc != N+2*i {
-            fmt.Println(“fail at”, i)
-        } else {
-            fmt.Println(“Request “, i, “is ok!”)
-        }
-    }
-    fmt.Println(“done”)
+	// Prepare appender function:
+	appender := func(c *Car) {
+		if _, ok := sortedCars[c.Manufacturer]; ok {
+			sortedCars[c.Manufacturer] = append(sortedCars[c.Manufacturer], c)
+		} else {
+			sortedCars["Default"] = append(sortedCars["Default"], c)
+		}
+	}
+	return appender, sortedCars
 }
 ```
 
 输出：
 
->Request 99 is ok!
->Request 98 is ok!
->...
->Request 1 is ok!
->Request 0 is ok!
->done
+>AllCars:  [0x1189b2d8 0x1189b2f0 0x1189b308 0x1189b320]
+>
+>New BMWs:  [0x1189b2f0]
+>
+>Map sortedCars:  map[Aston Martin:[] BMW:[0x1189b2f0 0x1189b320] Default:[0x1189b308] Ford:[0x1189b2d8] Jaguar:[] Land Rover:[]]
+>
+>We have  2  BMWs
 
-这个程序仅启动了 100 个协程。然而即使执行 100,000 个协程我们也能在数秒内看到它完成。这说明了 Go 的协程是如何的轻量：如果我们启动相同数量的真实的线程，程序早就崩溃了。
-
-multiple_server.go
-
-```go
-package main
-
-import "fmt"
-
-type Request struct {
-	a, b   int
-	replyc chan int // reply channel inside the Request
-}
-
-type binOp func(a, b int) int
-
-func run(op binOp, req *Request) {
-	req.replyc <- op(req.a, req.b)
-}
-
-func server(op binOp, service chan *Request) {
-	for {
-		req := <-service // requests arrive here
-		// start goroutine for request:
-		go run(op, req) // don't wait for op
-	}
-}
-
-func startServer(op binOp) chan *Request {
-	reqChan := make(chan *Request)
-	go server(op, reqChan)
-	return reqChan
-}
-
-func main() {
-	adder := startServer(func(a, b int) int { return a + b })
-	const N = 100
-	var reqs [N]Request
-	for i := 0; i < N; i++ {
-		req := &reqs[i]
-		req.a = i
-		req.b = i + N
-		req.replyc = make(chan int)
-		adder <- req
-	}
-	// checks:
-	for i := N - 1; i >= 0; i-- { // doesn't matter what order
-		if <-reqs[i].replyc != N+2*i {
-			fmt.Println("fail at", i)
-		} else {
-			fmt.Println("Request ", i, " is ok!")
-		}
-	}
-	fmt.Println("done")
-}
-
-```
-
-**卸载（Teardown）：通过信号通道关闭服务器**
-
-在上一个版本中 `server` 在 `main` 函数返回后并没有完全关闭，而被强制结束了。为了改进这一点，我们可以提供一个退出通道给 `server` ：
-
-```go
-func startServer(op binOp) (service chan *Request, quit chan bool) {
-    service = make(chan *Request)
-    quit = make(chan bool)
-    go server(op, service, quit)
-    return service, quit
-}
-```
-
-`server` 函数现在则使用 `select` 在 `service` 通道和 `quit` 通道之间做出选择：
-
-```go
-func server(op binOp, service chan *request, quit chan bool) {
-    for {
-        select {
-            case req := <-service:
-                go run(op, req) 
-            case <-quit:
-                return   
-        }
-    }
-}
-```
-
-当 `quit` 通道接收到一个 `true` 值时，`server` 就会返回并结束。
-
-在 `main` 函数中我们做出如下更改：
-
-```go
-    adder, quit := startServer(func(a, b int) int { return a + b })
-```
-
-在 `main` 函数的结尾处我们放入这一行：`quit <- true`
-
-mulriplex_server2.go
-
-```go
-package main
-
-import "fmt"
-
-type Request struct {
-	a, b   int
-	replyc chan int // reply channel inside the Request
-}
-
-type binOp func(a, b int) int
-
-func run(op binOp, req *Request) {
-	req.replyc <- op(req.a, req.b)
-}
-
-func server(op binOp, service chan *Request, quit chan bool) {
-	for {
-		select {
-		case req := <-service:
-			go run(op, req)
-		case <-quit:
-			return
-		}
-	}
-}
-
-func startServer(op binOp) (service chan *Request, quit chan bool) {
-	service = make(chan *Request)
-	quit = make(chan bool)
-	go server(op, service, quit)
-	return service, quit
-}
-
-func main() {
-	adder, quit := startServer(func(a, b int) int { return a + b })
-	const N = 100
-	var reqs [N]Request
-	for i := 0; i < N; i++ {
-		req := &reqs[i]
-		req.a = i
-		req.b = i + N
-		req.replyc = make(chan int)
-		adder <- req
-	}
-	// checks:
-	for i := N - 1; i >= 0; i-- { // doesn't matter what order
-		if <-reqs[i].replyc != N+2*i {
-			fmt.Println("fail at", i)
-		} else {
-			fmt.Println("Request ", i, " is ok!")
-		}
-	}
-	quit <- true
-	fmt.Println("done")
-}
-```
-
-
-
-### 限制同时处理的请求数
-
-使用带缓冲区的通道很容易实现这一点（参见 14.2.5），其缓冲区容量就是同时处理请求的最大数量。程序 max_tasks.go虽然没有做什么有用的事但是却包含了这个技巧：超过 `MAXREQS` 的请求将不会被同时处理，因为当信号通道表示缓冲区已满时 `handle` 函数会阻塞且不再处理其他请求，直到某个请求从 `sem` 中被移除。`sem` 就像一个信号量，这一专业术语用于在程序中表示特定条件的标志变量。
-
-max_task.go
-
-```go
-package main
-
-const MAXREQS = 50
-
-var sem = make(chan int, MAXREQS)
-
-type Request struct {
-	a, b   int
-	replyc chan int
-}
-
-func process(r *Request) {
-	// do something
-}
-
-func handle(r *Request) {
-	sem <- 1 // doesn't matter what we put in it
-	process(r)
-	<-sem // one empty place in the buffer: the next request can start
-}
-
-func server(service chan *Request) {
-	for {
-		request := <-service
-		go handle(request)
-	}
-}
-
-func main() {
-	service := make(chan *Request)
-	go server(service)
-}
-
-```
-
-通过这种方式，应用程序可以通过使用缓冲通道（通道被用作信号量）使协程同步其对该资源的使用，从而充分利用有限的资源（如内存）。
-
-### 链式协程
-
-在 main 函数中的 for
-循环里启动。当循环完成之后，一个 0 被写入到最右边的通道里，于是 100,000 个协程开始执行，接着 `1000000` 这个结果会在 1.5 秒之内被打印出来。
-
-这个程序同时也展示了如何通过 `flag.Int` 来解析命令行中的参数以指定协程数量，例如：`chaining -n=7000` 会生成 7000 个协程。
-
-chaining.go
-
-```go
-package main
-
-import (
-	"flag"
-	"fmt"
-)
-
-var ngoroutine = flag.Int("n", 100000, "how many goroutines")
-
-func f(left, right chan int) { left <- 1 + <-right }
-
-func main() {
-	flag.Parse()
-	leftmost := make(chan int)
-	var left, right chan int = nil, leftmost
-	for i := 0; i < *ngoroutine; i++ {
-		left, right = right, make(chan int)
-		go f(left, right)
-	}
-	right <- 0      // bang!
-	x := <-leftmost // wait for completion
-	fmt.Println(x)  // 100000, about 1.5 s
-}
-```
-
-
-
-### 在多核心上并行计算
-
-假设我们有 `NCPU` 个 CPU 核心：`const  NCPU = 4 //对应一个四核处理器` 然后我们想把计算量分成 `NCPU` 个部分，每一个部分都和其他部分并行运行。
-
-这可以通过以下代码所示的方式完成（我们且省略具体参数）
-
-```go
-func DoAll(){
-    sem := make(chan int, NCPU) // Buffering optional but sensible
-    for i := 0; i < NCPU; i++ {
-        go DoPart(sem)
-    }
-    // Drain the channel sem, waiting for NCPU tasks to complete
-    for i := 0; i < NCPU; i++ {
-        <-sem // wait for one task to complete
-    }
-    // All done.
-}
-
-func DoPart(sem chan int) {
-    // do the part of the computation
-    sem <-1 // signal that this piece is done
-}
-
-func main() {
-    runtime.GOMAXPROCS(NCPU) // runtime.GOMAXPROCS = NCPU
-    DoAll()
-}
-```
-
-- `DoAll()` 函数创建了一个 `sem` 通道，每个并行计算都将在对其发送完成信号；在一个 for 循环中 `NCPU` 个协程被启动了，每个协程会承担 `1/NCPU` 的工作量。每一个 `DoPart()` 协程都会向 `sem` 通道发送完成信号。
-
-- `DoAll()` 会在 for 循环中等待 `NCPU` 个协程完成：`sem` 通道就像一个信号量，这份代码展示了一个经典的信号量模式。
-
-在以上运行模型中，您还需将 `GOMAXPROCS` 设置为 `NCPU`
-
-### 并行化大量数据的计算
-
-假设我们需要处理一些数量巨大且互不相关的数据项，它们从一个 `in` 通道被传递进来，当我们处理完以后又要将它们放入另一个 `out` 通道，就像一个工厂流水线一样。处理每个数据项也可能包含许多步骤：Preprocess（预处理） / StepA（步骤A） / StepB（步骤B） / ... / PostProcess（后处理）
-
-一个典型的用于解决按顺序执行每个步骤的顺序流水线算法可以写成下面这样：
-
-```go 
-func SerialProcessData(in <-chan *Data, out chan<- *Data) {
-    for data := range in {
-        tmpA := PreprocessData(data)
-        tmpB := ProcessStepA(tmpA)
-        tmpC := ProcessStepB(tmpB)
-        out <- PostProcessData(tmpC)
-    }
-}
-```
-
-一次只执行一个步骤，并且按顺序处理每个项目：在第 1 个项目没有被 `PostProcess` 并放入 `out` 通道之前绝不会处理第 2 个项目。
-
-如果你仔细想想，你很快就会发现这将会造成巨大的时间浪费。
-
-一个更高效的计算方式是让每一个处理步骤作为一个协程独立工作。每一个步骤从上一步的输出通道中获得输入数据。这种方式仅有极少数时间会被浪费，而大部分时间所有的步骤都在一直执行中：
-
-```go
-func ParallelProcessData (in <-chan *Data, out chan<- *Data) {
-    // make channels:
-    preOut := make(chan *Data, 100)
-    stepAOut := make(chan *Data, 100)
-    stepBOut := make(chan *Data, 100)
-    stepCOut := make(chan *Data, 100)
-    // start parallel computations:
-    go PreprocessData(in, preOut)
-    go ProcessStepA(preOut,StepAOut)
-    go ProcessStepB(StepAOut,StepBOut)
-    go ProcessStepC(StepBOut,StepCOut)
-    go PostProcessData(StepCOut,out)
-}   
-```
-
-通道的缓冲区大小可以用来进一步优化整个过程。
-
-### 漏桶算法
-
-（译者注：翻译遵照原文，但是对于完全没听过这个算法的人来说比较晦涩，请配合代码片段理解）
-
-考虑以下的客户端-服务器结构：客户端协程执行一个无限循环从某个源头（也许是网络）接收数据；数据读取到 `Buffer` 类型的缓冲区。为了避免分配过多的缓冲区以及释放缓冲区，它保留了一份空闲缓冲区列表，并且使用一个缓冲通道来表示这个列表：`var freeList = make(chan *Buffer,100)`
-
-这个可重用的缓冲区队列（freeList）与服务器是共享的。 当接收数据时，客户端尝试从 `freeList` 获取缓冲区；但如果此时通道为空，则会分配新的缓冲区。一旦消息被加载后，它将被发送到服务器上的 `serverChan` 通道：
-
-```go
-    var serverChan = make(chan *Buffer)
-```
-
-以下是客户端的算法代码：
-
-```go
-func client() {
-   for {
-       var b *Buffer
-       // Grab a buffer if available; allocate if not 
-       select {
-           case b = <-freeList:
-               // Got one; nothing more to do
-           default:
-               // None free, so allocate a new one
-               b = new(Buffer)
-       }
-       loadInto(b)         // Read next message from the network
-       serverChan <- b     // Send to server
-       
-   }
-}
-```
-
-服务器的循环则接收每一条来自客户端的消息并处理它，之后尝试将缓冲返回给共享的空闲缓冲区：
-
-```go
-func server() {
-    for {
-        b := <-serverChan       // Wait for work.
-        process(b)
-        // Reuse buffer if there's room.
-        select {
-            case freeList <- b:
-                // Reuse buffer if free slot on freeList; nothing more to do
-            default:
-                // Free list full, just carry on: the buffer is 'dropped'
-        }
-    }
-}
-```
-
-但是这种方法在 `freeList` 通道已满的时候是行不通的，因为无法放入空闲 `freeList` 通道的缓冲区会被“丢到地上”由垃圾收集器回收（故名：漏桶算法）
-
-### 对Go协程进行基准测试
-
-我们提到了在 Go 语言中对你的函数进行基准测试。在此我们将其应用到一个用协程向通道写入整数再读出的实例中。这个函数将通过 `testing.Benchmark` 调用 `N` 次（例如：`N = 1,000,000`），`BenchMarkResult` 有一个 `String()` 方法来输出其结果。`N` 的值将由 `gotest` 来判断并取得一个足够大的数字，以获得合理的基准测试结果。当然同样的基准测试方法也适用于普通函数。
-
-如果你想排除指定部分的代码或者更具体的指定要测试的部分，可以使用 `testing.B.startTimer()` 和 `testing.B.stopTimer()` 来开始或结束计时器。基准测试只有在所有的测试通过后才能运行！ 
-
-benchmark_channels,go
-
-```go
-package main
-
-import (
-	"fmt"
-	"testing"
-)
-
-func main() {
-	fmt.Println(" sync", testing.Benchmark(BenchmarkChannelSync).String())
-	fmt.Println("buffered", testing.Benchmark(BenchmarkChannelBuffered).String())
-}
-
-func BenchmarkChannelSync(b *testing.B) {
-	ch := make(chan int)
-	go func() {
-		for i := 0; i < b.N; i++ {
-			ch <- i
-		}
-		close(ch)
-	}()
-	for range ch {
-	}
-}
-
-func BenchmarkChannelBuffered(b *testing.B) {
-	ch := make(chan int, 128)
-	go func() {
-		for i := 0; i < b.N; i++ {
-			ch <- i
-		}
-		close(ch)
-	}()
-	for range ch {
-	}
-}
-```
-
-
-
-### 使用通道并发访问对象
