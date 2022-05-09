@@ -73,6 +73,129 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+const (
+	N   int = 10010
+	M       = N * 2
+	inf int = -0x3f3f3f3f
+)
+
+var (
+	head, ver, nex, edge [N << 1]int
+	tot                  int = 0
+)
+
+func addedge(x, y, z int) {
+	tot++
+	ver[tot] = y
+	nex[tot] = head[x]
+	head[x] = tot
+	edge[tot] = z
+}
+
+var (
+	d1, d2, p1, up, is_leaf [N]int
+)
+
+func dfs_d(x, fa int) int {
+	d1[x] = inf
+	d2[x] = inf
+	for i := head[x]; i != 0; i = nex[i] {
+		y := ver[i]
+		if y == fa {
+			continue
+		}
+		d := dfs_d(y, x) + edge[i]
+		if d >= d1[x] {
+			d2[x] = d1[x]
+			d1[x] = d
+			p1[x] = y
+		} else if d > d2[x] {
+			d2[x] = d
+		}
+	}
+
+	if d1[x] == inf {
+		d1[x] = 0
+		d2[x] = 0
+		is_leaf[x] = 1
+	}
+
+	return d1[x]
+}
+
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
+
+func min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
+}
+
+func dfs_u(x, fa int) {
+	for i := head[x]; i != 0; i = nex[i] {
+		y := ver[i]
+		if y == fa {
+			continue
+		}
+		if p1[x] == y {
+			up[y] = max(up[x], d2[x]) + edge[i]
+		} else {
+			up[y] = max(up[x], d1[x]) + edge[i]
+		}
+		dfs_u(y, x)
+	}
+}
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+		return x
+	}
+
+	n := read()
+	for i := 1; i <= n-1; i++ {
+		x, y, z := read(), read(), read()
+		addedge(x, y, z)
+		addedge(y, x, z)
+	}
+	dfs_d(1, 0)
+	dfs_u(1, 0)
+	res := d1[1]
+	for i := 2; i <= n; i++ {
+		if is_leaf[i] == 1 {
+			res = min(res, up[i])
+		} else {
+			res = min(res, max(d1[i], up[i]))
+		}
+	}
+	fmt.Println(res)
+}
+
+```
+
 
 
 # 八股文

@@ -75,6 +75,133 @@ int main() {
 } 
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sort"
+)
+
+const N int = 2e5 + 100
+
+type Segment struct {
+	l, r, dat int
+}
+
+var (
+	tot int = 0
+	t   [N << 5]Segment
+)
+
+func build(p *int, l, r int) {
+	tot++
+	*p = tot
+	if l == r {
+		return
+	}
+	mid := (l + r) >> 1
+	lc := &t[*p].l
+	rc := &t[*p].r
+	build(lc, l, mid)
+	build(rc, mid+1, r)
+}
+
+func update(p *int, now, l, r, x int) {
+	tot++
+	*p = tot
+	t[*p] = t[now]
+	t[*p].dat++
+	if l == r {
+		return
+	}
+	lc := &t[*p].l
+	rc := &t[*p].r
+	mid := (l + r) >> 1
+	if x <= mid {
+		update(lc, t[now].l, l, mid, x)
+	} else {
+		update(rc, t[now].r, mid+1, r, x)
+	}
+}
+
+func query(t1, t2, l, r, x int) int {
+	if l == r {
+		return l
+	}
+	mid := (l + r) >> 1
+	k := t[t[t2].l].dat - t[t[t1].l].dat
+	if x <= k {
+		return query(t[t1].l, t[t2].l, l, mid, x)
+	} else {
+		return query(t[t1].r, t[t2].r, mid+1, r, x-k)
+	}
+}
+
+type datas []int
+
+func (d datas) Len() int           { return len(d) }
+func (d datas) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
+func (d datas) Less(i, j int) bool { return d[i] < d[j] }
+
+var a = make(datas, N)
+var b = make(datas, 0, N)
+var idMap = make(map[int]int)
+var dMap = make(map[int]int)
+
+func main() {
+
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+
+	read := func() (x int) {
+		in.Scan()
+
+		for _, b := range in.Bytes() {
+			x = (x << 3) + (x << 1) + int(b-'0')
+		}
+		return x
+	}
+
+	n, m := read(), read()
+	for i := 1; i <= n; i++ {
+		a[i] = read()
+		b = append(b, a[i])
+	}
+
+	sort.Sort(b)
+	idMap := make(map[int]int)
+	dMap := make(map[int]int)
+	p := 1
+	idMap[b[0]] = p
+	dMap[p] = b[0]
+	for i := 1; i < n; i++ {
+		if b[i] != b[i-1] {
+			p++
+		}
+		idMap[b[i]] = p
+		dMap[p] = b[i]
+	}
+
+	root := make([]int, N)
+	build(&root[0], 1, n)
+	for i := 1; i <= n; i++ {
+		update(&root[i], root[i-1], 1, p, idMap[a[i]])
+	}
+
+	for ; m > 0; m-- {
+		l, r, k := read(), read(), read()
+		fmt.Println(dMap[query(root[l-1], root[r], 1, p, k)])
+	}
+
+}
+
+```
+
 
 
 # C ++ 八股文
