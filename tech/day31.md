@@ -73,3 +73,123 @@ int main() {
 }
 ```
 
+
+
+Go版本：
+
+```go
+package main
+
+import (
+	"bufio"
+	"container/list"
+	"fmt"
+	"os"
+)
+
+const (
+	N int = 2e6 + 10
+)
+
+var (
+	tot            int = 0
+	head, ver, nex [N]int
+	dfn, low, col  [N]int
+	ins            [N]bool
+	num            int = 0
+	cnt            int = 0
+)
+
+func addedge(x, y int) {
+	tot++
+	ver[tot] = y
+	nex[tot] = head[x]
+	head[x] = tot
+}
+
+func min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
+}
+
+var lis = list.New()
+
+func tarjan(x int) {
+	num++
+	dfn[x] = num
+	low[x] = num
+	ins[x] = true
+	lis.PushBack(x)
+	for i := head[x]; i != 0; i = nex[i] {
+		y := ver[i]
+		if dfn[y] == 0 {
+			tarjan(y)
+			low[x] = min(low[x], low[y])
+		} else if ins[y] == true {
+			low[x] = min(low[x], dfn[y])
+		}
+	}
+	if dfn[x] == low[x] {
+		var y int
+		cnt++
+		for {
+			li := lis.Back()
+			y = li.Value.(int)
+			lis.Remove(li)
+			ins[y] = false
+			col[y] = cnt
+			if x == y {
+				break
+			}
+		}
+	}
+}
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+	out := bufio.NewWriter(os.Stdout)
+	defer out.Flush()
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+
+		return x
+	}
+
+	n, m := read(), read()
+
+	for i := 1; i <= m; i++ {
+		a, va, b, vb := read(), read(), read(), read()
+		addedge(a+(va&1)*n, b+(vb^1)*n)
+		addedge(b+(vb&1)*n, a+(va^1)*n)
+	}
+
+	for i := 1; i <= 2*n; i++ {
+		if dfn[i] == 0 {
+			tarjan(i)
+		}
+	}
+
+	for i := 1; i <= n; i++ {
+		if col[i] == col[i+n] {
+			fmt.Println("IMPOSSIBLE")
+			return
+		}
+	}
+	fmt.Fprintln(out, "POSSIBLE")
+	for i := 1; i <= n; i++ {
+		if col[i] < col[i+n] {
+			fmt.Fprintf(out, "1 ")
+		} else {
+			fmt.Fprintf(out, "0 ")
+		}
+	}
+}
+
+```
+

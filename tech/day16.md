@@ -51,6 +51,102 @@ int main() {
 } 
 ```
 
+GO版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sort"
+)
+
+const (
+	N int = 2e5
+)
+
+type Edge struct {
+	x, y, z int
+}
+
+type EdgeList []Edge
+
+func (e EdgeList) Len() int {
+	return len(e)
+}
+func (e EdgeList) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+
+func (e EdgeList) Less(i, j int) bool {
+	return e[i].z < e[j].z
+}
+
+var (
+	fa [N]int
+)
+
+func find(x int) int {
+	if x == fa[x] {
+		return x
+	} else {
+		fa[x] = find(fa[x])
+		return fa[x]
+	}
+}
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+
+		return x
+	}
+
+	n, m := read(), read()
+	p := make(EdgeList, m)
+	for i := range p {
+		x, y, z := read(), read(), read()
+		p[i] = Edge{x, y, z}
+	}
+
+	for i := 1; i <= n; i++ {
+		fa[i] = i
+	}
+
+	sort.Sort(p)
+	cnt := 0
+	ans := 0
+	for i := range p {
+		x := find(p[i].x)
+		y := find(p[i].y)
+		if x != y {
+			fa[x] = y
+			cnt++
+			ans += p[i].z
+		}
+		if cnt == n-1 {
+			break
+		}
+	}
+
+	if cnt != n-1 {
+		fmt.Println("orz")
+	} else {
+		fmt.Println(ans)
+	}
+
+}
+
+```
+
 
 
 # redis 八股文
