@@ -31,6 +31,7 @@ func main() {
 			fmt.Println("Error accepting", err.Error())
 			return // 终止程序
 		}
+        // 成功接受，就开启一个协程去处理
 		go doServerStuff(conn)
 	}
 }

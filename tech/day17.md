@@ -58,6 +58,87 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"container/list"
+	"fmt"
+	"math"
+	"os"
+)
+
+const (
+	N   int = 5e5 + 100
+	INF int = 0x3f3f3f3f
+)
+
+var (
+	head, ver, nex, edge [N << 2]int
+	tot                  int = 0
+	d                    [N]int
+)
+
+func addedge(x, y, z int) {
+	tot++
+	ver[tot] = y
+	nex[tot] = head[x]
+	edge[tot] = z
+	head[x] = tot
+}
+
+func spfa(s int) {
+	for i := 1; i < N; i++ {
+		d[i] = INF
+	}
+	in := make([]bool, N)
+	q := list.New()
+	d[s] = 0
+	in[s] = true
+	q.PushBack(s)
+	for q.Len() > 0 {
+		e := q.Front()
+		q.Remove(e)
+		x := e.Value.(int)
+		in[x] = false
+		for i := head[x]; i != 0; i = nex[i] {
+			y := ver[i]
+			if d[y] > d[x]+edge[i] {
+				d[y] = d[x] + edge[i]
+
+				if in[y] == false {
+					q.PushBack(y)
+				}
+			}
+		}
+
+	}
+}
+
+func main() {
+	in := bufio.NewReader(os.Stdin)
+	var n, m, s int
+	fmt.Fscan(in, &n, &m, &s)
+	for i := 1; i <= m; i++ {
+		var x, y, z int
+		fmt.Fscan(in, &x, &y, &z)
+		addedge(x, y, z)
+	}
+	spfa(s)
+	for i := 1; i <= n; i++ {
+		if d[i] == INF {
+			fmt.Printf("%d ", math.MaxInt32)
+		} else {
+			fmt.Printf("%d ", d[i])
+		}
+	}
+}
+
+```
+
 
 
 # redis 八股文
