@@ -30,6 +30,39 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import "fmt"
+
+func gcd(x, y int) int {
+	if y == 0 {
+		return x
+	}
+	return gcd(y, x%y)
+}
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	ans := 0
+	for i := 0; i < n; i++ {
+		var x int
+		fmt.Scan(&x)
+		if x < 0 {
+			x = -x
+		}
+		ans = gcd(ans, x)
+	}
+	fmt.Println(ans)
+}
+
+```
+
+
+
 [P3390 【模板】矩阵快速幂](https://www.luogu.com.cn/problem/P3390)
 
 ```cpp
@@ -93,6 +126,76 @@ int main() {
 	return 0;
 } 
 ```
+
+Go 版本
+
+```go
+package main
+
+import "fmt"
+
+const (
+	N   int   = 120
+	mod int64 = 1e9 + 7
+)
+
+var (
+	n int
+)
+
+type Matrix struct {
+	a [N][N]int64
+}
+
+func (M *Matrix) init() {
+	for i := 1; i <= n; i++ {
+		M.a[i][i] = 1
+	}
+}
+
+func (A *Matrix) Mul(B Matrix) (C Matrix) {
+	for i := 1; i <= n; i++ {
+		for j := 1; j <= n; j++ {
+			for k := 1; k <= n; k++ {
+				C.a[i][j] = (C.a[i][j] + A.a[i][k]*B.a[k][j]) % mod
+			}
+		}
+	}
+	return C
+}
+
+func quick(A Matrix, b int64) (res Matrix) {
+	res.init()
+	for ; b != 0; b >>= 1 {
+		if (b & 1) == 1 {
+			res = res.Mul(A)
+		}
+		A = A.Mul(A)
+	}
+	return res
+}
+
+func main() {
+	var k int64
+	fmt.Scan(&n, &k)
+	var A Matrix
+	for i := 1; i <= n; i++ {
+		for j := 1; j <= n; j++ {
+			fmt.Scan(&A.a[i][j])
+		}
+	}
+	A = quick(A, k)
+	for i := 1; i <= n; i++ {
+		for j := 1; j <= n; j++ {
+			fmt.Printf("%d ", A.a[i][j])
+		}
+		fmt.Println()
+	}
+}
+
+```
+
+
 
 # 技术部分
 

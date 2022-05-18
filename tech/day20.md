@@ -110,6 +110,158 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"container/list"
+	"fmt"
+	"os"
+)
+
+const N int = 5e5 + 100
+
+var (
+	head1, head2, nex, ver [N << 1]int
+	a, low, c, ins         [N]int
+	dfn, val               [N]int
+	cnt, num               int = 0, 0
+	tot, top               int = 0, 0
+	st                     [N]int
+)
+
+func addedge(head *[N << 1]int, x, y int) {
+	tot++
+	ver[tot] = y;
+	nex[tot] = head[x];
+	head[x] = tot
+}
+
+func min(x, y int) int {
+	if x > y {
+		return y
+	}
+	return x
+}
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func tarjan(x int) {
+	num++;
+	top++
+	dfn[x] = num;
+	low[x] = num
+	ins[x] = 1;
+	st[top] = x
+	for i := head1[x]; i != 0; i = nex[i] {
+		y := ver[i]
+		if dfn[y] == 0 {
+			tarjan(y)
+			low[x] = min(low[x], low[y])
+		} else if ins[y] == 1 {
+			low[x] = min(low[x], dfn[y])
+		}
+	}
+	if dfn[x] == low[x] {
+		cnt++
+		for {
+			y := st[top];
+			top--
+			ins[y] = 0
+			c[y] = cnt
+			val[cnt] += a[y]
+
+			if x == y {
+				break
+			}
+		}
+	}
+}
+
+var (
+	d, deg [N]int
+)
+
+func topo() {
+	lis := list.New()
+	for i := 1; i <= cnt; i++ {
+		if deg[i] == 0 {
+			d[i] = val[i]
+			lis.PushBack(i)
+		}
+	}
+	for lis.Len() > 0 {
+		e := lis.Front()
+		lis.Remove(e)
+		x := e.Value.(int)
+		for i := head2[x]; i != 0; i = nex[i] {
+			y := ver[i]
+			d[y] = max(d[y], d[x]+val[y])
+			deg[y]--
+			if (deg[y] == 0) {
+				lis.PushBack(y)
+			}
+		}
+	}
+}
+
+func main() {
+
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+		return x
+	}
+
+	n, m := read(), read()
+	for i := 1; i <= n; i++ {
+		a[i] = read()
+	}
+
+	for i := 1; i <= m; i++ {
+		x, y := read(), read()
+		addedge(&head1, x, y)
+	}
+
+	for i := 1; i <= n; i++ {
+		if dfn[i] == 0 {
+			tarjan(i)
+		}
+	}
+
+	for x := 1; x <= n; x++ {
+		for i := head1[x]; i != 0; i = nex[i] {
+			y := ver[i]
+			if c[x] == c[y] {
+				continue
+			}
+			addedge(&head2, c[x], c[y])
+			deg[c[y]]++
+		}
+	}
+	topo()
+
+	ans := d[1]
+	for i := 1; i <= n; i++ {
+		ans = max(ans, d[i])
+	}
+
+	fmt.Println(ans)
+}
+
+```
+
 
 
 # RabittMq 八股文

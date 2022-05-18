@@ -70,6 +70,97 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"container/list"
+	"fmt"
+	"math"
+)
+
+const N int = 1e5 + 100
+
+var (
+	head, ver, nex, edge [N << 1]int
+	tot                  int = 0
+	n, m                 int
+)
+
+func addedge(x, y, z int) {
+	tot++
+	ver[tot] = y
+	nex[tot] = head[x]
+	head[x] = tot
+	edge[tot] = z
+}
+
+func spfa(s int) bool {
+	cnt := make([]int, N)
+	d := make([]int, N)
+	for i := 0; i < N; i++ {
+		d[i] = math.MaxInt32
+	}
+	in := make([]bool, N)
+	lis := list.New()
+	lis.PushBack(s)
+	d[s] = 0
+	in[s] = true
+	for lis.Len() > 0 {
+		e := lis.Front()
+		lis.Remove(e)
+		x := e.Value.(int)
+		in[x] = false
+		for i := head[x]; i != 0; i = nex[i] {
+			y := ver[i]
+			if d[y] > d[x]+edge[i] {
+				d[y] = d[x] + edge[i]
+				cnt[y] = cnt[x] + 1
+				if cnt[y] >= n {
+					return true
+				}
+				if !in[y] {
+					in[y] = true
+					lis.PushBack(y)
+				}
+			}
+		}
+	}
+	return false
+}
+
+func solve() {
+	for i := 0; i < N; i++ {
+		head[i] = 0
+	}
+	fmt.Scan(&n, &m)
+	for i := 1; i <= m; i++ {
+		var x, y, z int
+		fmt.Scan(&x, &y, &z)
+		addedge(x, y, z)
+		if z >= 0 {
+			addedge(y, x, z)
+		}
+	}
+	if spfa(1) {
+		fmt.Println("YES")
+	} else {
+		fmt.Println("NO")
+	}
+}
+
+func main() {
+	var T int
+	for fmt.Scan(&T); T > 0; T-- {
+		solve()
+	}
+
+}
+
+```
+
 
 
 # Mysql 八股文
@@ -119,8 +210,8 @@ int main() {
 - Serializable（可串行化）
 
   通过强制事务排序，使之不可能相互冲突，从而解决幻读问题。简言之，它是在每个读的数据行上加上共享锁。在这个级别，可能导致大量的超时现象和锁竞争。
-
-事务隔离机制的实现基于锁机制和并发调度。其中并发调度使用的是MVVC（多版本并发控制），通过保存修改的旧版本信息来支持并发一致性读和回滚等特性。
+  
+  事务隔离机制的实现基于锁机制和并发调度。其中并发调度使用的是MVVC（多版本并发控制），通过保存修改的旧版本信息来支持并发一致性读和回滚等特性。
 
 #### 6. 什么是脏读？幻读？不可重复读？
 

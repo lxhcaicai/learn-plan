@@ -23,24 +23,30 @@ wiki.go
 package main
 
 import (
-	"net/http"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"regexp"
 	"text/template"
 )
 
 const lenPath = len("/view/")
 
+// 正则表达式 页面必须为数字和字母
 var titleValidator = regexp.MustCompile("^[a-zA-Z0-9]+$")
+
+// 网页模板解析
 var templates = make(map[string]*template.Template)
+
+//定义错误
 var err error
 
 type Page struct {
-	Title string
-	Body  []byte
+	Title string //记录标题
+	Body  []byte // 页面内容
 }
 
+// 在main函数前运行，加载edit.html 和 save html 到内存中
 func init() {
 	for _, tmpl := range []string{"edit", "view"} {
 		templates[tmpl] = template.Must(template.ParseFiles(tmpl + ".html"))
@@ -48,11 +54,13 @@ func init() {
 }
 
 func main() {
+	//HandleFunc在DefaultServeMux中注册给定模式的处理函数。
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
 	err := http.ListenAndServe("localhost:8080", nil)
 	if err != nil {
+		// Fatal等价于Print()后跟对os.Exit(1)的调用。
 		log.Fatal("ListenAndServe: ", err.Error())
 	}
 }
@@ -60,6 +68,7 @@ func main() {
 func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		title := r.URL.Path[lenPath:]
+		//如果不符合titleValidator的正则表达式则返回 找不到的请求404的结果
 		if !titleValidator.MatchString(title) {
 			http.NotFound(w, r)
 			return
@@ -71,7 +80,8 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p, err := load(title)
 	if err != nil { // page not found
-		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
+		// 页面重定向到找不到的页面上
+		http.Redirect(w, r, "/edit/"+title, http.StatusFound) // 302转向或者302重定向（302 redirect）指的是当浏览器要求一个网页的时候，主机所返回的状态码。
 		return
 	}
 	renderTemplate(w, "view", p)
@@ -90,6 +100,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p := &Page{Title: title, Body: []byte(body)}
 	err := p.save()
 	if err != nil {
+		// 页面错误
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -97,6 +108,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
+	// 将页面的内容写入到网页上
 	err := templates[tmpl].Execute(w, p)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -105,18 +117,23 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 
 func (p *Page) save() error {
 	filename := p.Title + ".txt"
-	// file created with read-write permissions for the current user only
+	// 对当前用户创建具有读写权限的文件。。。
 	return ioutil.WriteFile(filename, p.Body, 0600)
 }
 
+// 加载title 文件，
 func load(title string) (*Page, error) {
 	filename := title + ".txt"
+	// 调用ioutil读入文件
 	body, err := ioutil.ReadFile(filename)
 	if err != nil {
+		// 读取错误则返回错误的页面
 		return nil, err
 	}
+	//  返回页面的地址
 	return &Page{Title: title, Body: body}, nil
 }
+
 ```
 
 让我们来通读代码：

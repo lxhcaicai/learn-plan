@@ -219,49 +219,65 @@ general_lazy_evalution1.go
 package main
 
 import (
-    "fmt"
+	"fmt"
 )
 
 type Any interface{}
 type EvalFunc func(Any) (Any, Any)
 
 func main() {
-    evenFunc := func(state Any) (Any, Any) {
-        os := state.(int)
-        ns := os + 2
-        return os, ns
-    }
-    
-    even := BuildLazyIntEvaluator(evenFunc, 0)
-    
-    for i := 0; i < 10; i++ {
-        fmt.Printf("%vth even: %v\n", i, even())
-    }
+	evenFunc := func(state Any) (Any, Any) {
+		//任何类型的值
+		os := state.(int)
+		// ns 为 os的值 + 2
+		ns := os + 2
+		// 返回这个值对
+		return os, ns
+	}
+
+	// 调用上面的匿名函数， 初始化参数为0
+	even := BuildLazyIntEvaluator(evenFunc, 0)
+
+	for i := 0; i < 10; i++ {
+		fmt.Printf("%vth even: %v\n", i, even())
+	}
 }
 
 func BuildLazyEvaluator(evalFunc EvalFunc, initState Any) func() Any {
-    retValChan := make(chan Any)
-    loopFunc := func() {
-        var actState Any = initState
-        var retVal Any
-        for {
-            retVal, actState = evalFunc(actState)
-            retValChan <- retVal
-        }
-    }
-    retFunc := func() Any {
-        return <- retValChan
-    }
-    go loopFunc()
-    return retFunc
+	// 创建一个 接口通道
+	retValChan := make(chan Any)
+	// 定义匿名函数返回调用
+	loopFunc := func() {
+		// 将 initSate 的接口 赋值给 actState
+		var actState Any = initState
+		var retVal Any
+		for {
+			// 接收 evalFunc() 函数的值 // 注意函数内部的的值为 actState 即比原来的值 + 2
+			retVal, actState = evalFunc(actState)
+			retValChan <- retVal // 将retVal 的值放入通道中
+		}
+	}
+	// 定义一个匿名函数，每次调用返回一个 retValChan 通道内部的值
+	retFunc := func() Any {
+		return <-retValChan
+	}
+
+	// 开启一个协程
+	go loopFunc()
+
+	// 返回 retFunc 匿名函数
+	return retFunc
 }
 
+// 返回的是BuildLazyEvaluator构造的函数  = >  这个函数主要是将接口转换成int 再返回
 func BuildLazyIntEvaluator(evalFunc EvalFunc, initState Any) func() int {
-    ef := BuildLazyEvaluator(evalFunc, initState)
-    return func() int {
-        return ef().(int)
-    }
+	ef := BuildLazyEvaluator(evalFunc, initState)
+	return func() int {
+		// 将匿名函数的值 转化成 int 返回 也就是 返回通到retValChan 输出的值
+		return ef().(int)
+	}
 }
+
 ```
 
 >0th even: 0
@@ -390,11 +406,11 @@ func main() {
         req.a = i
         req.b = i + N
         req.replyc = make(chan int)
-        adder <- req  // adder is a channel of requests
+        adder <- req  // adder is a channel of requests // adder 是个请求通道
     }
     // checks:
     for i := N - 1; i >= 0; i-- {
-        // doesn’t matter what order
+        // doesn’t matter what order  // 顺序无关紧要
         if <-reqs[i].replyc != N+2*i {
             fmt.Println(“fail at”, i)
         } else {

@@ -58,6 +58,110 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"container/heap"
+	"fmt"
+	"math"
+	"os"
+)
+
+const (
+	N int = 2e5 + 100
+)
+
+var (
+	head, ver, nex, edge [N]int
+	tot                  int = 0
+	dis                  [N]int
+)
+
+func addedge(x, y, z int) {
+	tot++
+	ver[tot] = y
+	nex[tot] = head[x]
+	head[x] = tot
+	edge[tot] = z
+}
+
+type pair struct {
+	dis, x int
+}
+
+type pairlist []pair
+
+func (h *pairlist) Less(i, j int) bool {
+	return (*h)[i].dis < (*h)[j].dis
+}
+
+func (h *pairlist) Swap(i, j int) {
+	(*h)[i], (*h)[j] = (*h)[j], (*h)[i]
+}
+
+func (h *pairlist) Len() int {
+	return len(*h)
+}
+
+func (h *pairlist) Pop() (v interface{}) {
+	*h, v = (*h)[:h.Len()-1], (*h)[h.Len()-1]
+	return
+}
+
+func (h *pairlist) Push(v interface{}) {
+	*h = append(*h, v.(pair))
+}
+
+func dijkstra(s int) {
+	for i := 0; i < N; i++ {
+		dis[i] = math.MaxInt32
+	}
+	vis := make([]bool, N)
+	q := new(pairlist)
+	heap.Push(q, pair{0, s})
+	dis[s] = 0
+	for q.Len() != 0 {
+		p := heap.Pop(q).(pair)
+		x := p.x
+		if vis[x] == true {
+			continue
+		}
+		vis[x] = true
+		for i := head[x]; i != 0; i = nex[i] {
+
+			y := ver[i]
+			if dis[y] > dis[x]+edge[i] {
+				dis[y] = dis[x] + edge[i]
+
+				heap.Push(q, pair{dis[y], y})
+			}
+		}
+	}
+}
+
+func main() {
+	in := bufio.NewReader(os.Stdin)
+	out := bufio.NewWriter(os.Stdout)
+	defer out.Flush()
+	var n, m, s int
+	fmt.Fscan(in, &n, &m, &s)
+	for i := 1; i <= m; i++ {
+		var x, y, z int
+		fmt.Fscan(in, &x, &y, &z)
+		addedge(x, y, z)
+	}
+	dijkstra(s)
+	for i := 1; i <= n; i++ {
+		fmt.Fprintf(out, "%d ", dis[i])
+	}
+}
+
+```
+
 
 
 # Mysql 八股文

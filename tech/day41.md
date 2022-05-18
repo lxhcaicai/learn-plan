@@ -507,17 +507,20 @@ func main() {
 
 func f() {
 	defer func() {
+		// 检测到异常恢复
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in f", r)
 		}
 	}()
 	fmt.Println("Calling g.")
 	g(0)
+	// 因为发生了异常，这条语句不会执行
 	fmt.Println("Returned normally from g.")
 }
 
 func g(i int) {
 	if i > 3 {
+		// i > 3 发生异常
 		fmt.Println("Panicking!")
 		panic(fmt.Sprintf("%v", i))
 	}
