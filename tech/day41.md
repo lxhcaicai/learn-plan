@@ -337,51 +337,52 @@ package parse
 
 import (
 	"fmt"
-	"strings"
 	"strconv"
+	"strings"
 )
 
-// A ParseError indicates an error in converting a word into an integer.
+//  ParseError 展示了字符串转化成Int类型的错误
 type ParseError struct {
-    Index int      // The index into the space-separated list of words.
-    Word  string   // The word that generated the parse error.
-    Err error // The raw error that precipitated this error, if any.
+	Index int      // The index into the space-separated list of words.
+	Word  string   // The word that generated the parse error. 解析错误的单词
+	Err error // The raw error that precipitated this error, if any. // 造成上述错误的原始错误
 }
 
-// String returns a human-readable error message.
+// String returns a human-readable error message. // 返回一个人类能读的string
 func (e *ParseError) String() string {
-    return fmt.Sprintf("pkg parse: error parsing %q as int", e.Word)
+	return fmt.Sprintf("pkg parse: error parsing %q as int", e.Word)
 }
 
-// Parse parses the space-separated words in in put as integers.
+// Parse parses the space-separated words in in put as integers. // 计算输入的字符串的空格
 func Parse(input string) (numbers []int, err error) {
-    defer func() {
-        if r := recover(); r != nil {
-            var ok bool
-            err, ok = r.(error)
-            if !ok {
-                err = fmt.Errorf("pkg: %v", r)
-            }
-        }
-    }()
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("pkg: %v", r)
+			}
+		}
+	}()
 
-    fields := strings.Fields(input)
-    numbers = fields2numbers(fields)
-    return
+	fields := strings.Fields(input)
+	numbers = fields2numbers(fields)
+	return
 }
 
 func fields2numbers(fields []string) (numbers []int) {
-    if len(fields) == 0 {
-        panic("no words to parse")
-    }
-    for idx, field := range fields {
-        num, err := strconv.Atoi(field)
-        if err != nil {
-            panic(&ParseError{idx, field, err})
-        }
-        numbers = append(numbers, num)
-    }
-    return
+	if len(fields) == 0 {
+		panic("no words to parse")  // 如果为空则弹出为空的错误
+	}
+	for idx, field := range fields {
+		num, err := strconv.Atoi(field) // 将字符串转化整数
+		if err != nil {
+			// 出现错误， 弹出自定义的错误
+			panic(&ParseError{idx, field, err})
+		}
+		numbers = append(numbers, num)
+	}
+	return
 }
 ```
 
