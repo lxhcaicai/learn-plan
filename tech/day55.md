@@ -22,6 +22,7 @@ type API interface {
 }
 
 //NewAPI return Api instance by type
+// 按照类型返回API的实例
 func NewAPI(t int) API {
 	if t == 1 {
 		return &hiAPI{}
@@ -32,6 +33,7 @@ func NewAPI(t int) API {
 }
 
 //hiAPI is one of API implement
+// hiAPI 是API 的实现之一
 type hiAPI struct{}
 
 //Say hi to name
