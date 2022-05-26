@@ -50,6 +50,81 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+const N int = 1e5 + 100
+
+var (
+	f [N][17]int
+)
+
+func main() {
+
+	in := bufio.NewScanner(os.Stdin)
+	out := bufio.NewWriter(os.Stdout)
+	defer out.Flush()
+	in.Split(bufio.ScanWords)
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+		return x
+	}
+
+	n, m := read(), read()
+
+	for i := 1; i <= n; i++ {
+		f[i][0] = read()
+	}
+
+	max := func(a, b int) int {
+		if a > b {
+			return a
+		}
+		return b
+	}
+
+	log2n := make([]int, N)
+	func() {
+		log2n[2] = 1
+		for i := 3; i < N; i++ {
+			log2n[i] = log2n[i>>1] + 1
+		}
+	}()
+
+	func() {
+		t := log2n[n] + 1
+		for j := 1; j < t; j++ {
+			for i := 1; i <= n-(1<<j)+1; i++ {
+				f[i][j] = max(f[i][j-1], f[i+(1<<(j-1))][j-1])
+			}
+		}
+	}()
+
+	query := func(l, r int) int {
+		k := log2n[r-l+1]
+		return max(f[l][k], f[r-(1<<k)+1][k])
+	}
+
+	for ; m > 0; m-- {
+		l, r := read(), read()
+		fmt.Fprintf(out, "%d\n", query(l, r))
+	}
+
+}
+
+```
+
 
 
 # C ++ 部分
