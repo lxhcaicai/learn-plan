@@ -1,3 +1,107 @@
+
+
+# 算法刷题
+
+[最长回文子串](https://www.acwing.com/problem/content/description/1526/s)
+
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+const (
+	N    int    = 1e5 + 100
+	base uint64 = 131
+)
+
+var (
+	f1 [N]uint64
+	f2 [N]uint64
+	p  [N]uint64
+)
+
+func hash1(l, r int) uint64 {
+	return f1[r] - f1[l-1]*p[r-l+1]
+}
+
+func hash2(l, r int) uint64 {
+	return f2[l] - f2[r+1]*p[r-l+1]
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+	// 从ReadLine返回的文本不包括行尾回车，读入一行包含空格
+	s, _, _ := reader.ReadLine()
+	ss := string(s)
+	ss = "#" + ss
+	n := len(ss) - 1
+
+	f1[0], f2[n+1], p[0] = 0, 0, 1
+	for i := 1; i <= n; i++ {
+		f1[i] = f1[i-1]*base + uint64(ss[i]-' ')
+		p[i] = p[i-1] * base
+	}
+
+	for i := n; i > 0; i-- {
+		f2[i] = f2[i+1]*base + uint64(ss[i]-' ')
+	}
+
+	min := func(a, b int) int {
+		if a > b {
+			return b
+		}
+		return a
+	}
+
+	max := func(a, b int) int {
+		if a < b {
+			return b
+		}
+		return a
+	}
+
+	ans := 0
+	for i := 1; i <= n; i++ {
+		// 这里的长度是 i - 1 和 n - i 比较 
+		l, r := 0, min(i-1, n-i)
+		res := 0
+
+		for l <= r {
+			mid := (l + r) >> 1
+			if hash1(i-mid, i-1) == hash2(i+1, i+mid) {
+				l = mid + 1
+				res = mid
+			} else {
+				r = mid - 1
+			}
+		}
+		ans = max(ans, 2*res+1)
+		// 这里的长度是 i 和 n - i 比较 
+		l, r = 0, min(i, n-i)
+		for l <= r {
+			mid := (l + r) >> 1
+			if hash1(i-mid+1, i) == hash2(i+1, i+mid) {
+				l = mid + 1
+				res = mid
+			} else {
+				r = mid - 1
+			}
+		}
+		ans = max(ans, 2*res)
+	}
+	fmt.Println(ans)
+}
+
+```
+
+
+
 # 技术学习
 
 ## gin 框架

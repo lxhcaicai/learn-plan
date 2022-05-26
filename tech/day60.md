@@ -1,3 +1,42 @@
+# 算法刷题
+
+[十三号星期五](https://www.acwing.com/problem/content/description/1343/)
+
+Go 版本
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	cnt := make([]int, 7)
+
+	cal := func(y, m, d int) int {
+		if m <= 2 {
+			y--
+			m += 12
+		}
+		return (d + 2*m + 3*(m+1)/5 + y + y/4 - y/100 + y/400 + 1) % 7
+	}
+
+	for y := 1900; y <= 1900+n-1; y++ {
+		for m := 1; m <= 12; m++ {
+			cnt[cal(y, m, 13)]++
+		}
+	}
+
+	for i := 6; i < 13; i++ {
+		fmt.Printf("%d ", cnt[i%7])
+	}
+}
+
+```
+
+
+
 # 技术学习
 
 ## RabbitMQ
