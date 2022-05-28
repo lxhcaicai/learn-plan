@@ -36,6 +36,64 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"fmt"
+)
+
+const (
+	N int = 20
+)
+
+var (
+	f   [N][1 << 20]int
+	dis [N][N]int
+)
+
+func main() {
+	var n int
+	fmt.Scan(&n)
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			fmt.Scan(&dis[i][j])
+		}
+	}
+
+	for i := 0; i < N; i++ {
+		for j := 0; j < (1 << 20); j++ {
+			f[i][j] = 1e9
+		}
+	}
+	f[0][1] = 0
+
+	min := func(a, b int) int {
+		if a > b {
+			return b
+		}
+		return a
+	}
+
+	for i := 1; i < (1 << n); i++ {
+		for j := 0; j < n; j++ {
+			if ((i >> j) & 1) == 1 {
+				for k := 0; k < n; k++ {
+					if ((i ^ (1<<j))>>k&1) == 1 {
+						f[j][i] = min(f[j][i], f[k][i^(1<<j)]+dis[k][j])
+					}
+				}
+			}
+		}
+	}
+
+	fmt.Println(f[n-1][(1<<n)-1])
+}
+
+```
+
 
 
 
