@@ -65,7 +65,7 @@ auto query = [](auto self, int p, int l, int r) {
 		return t[p].dat;
 	}
 	spread(p);
-	i64 val = 0;ac
+	i64 val = 0;
 	if(l <= mid) val += self(self, lc, l, r);
 	if(r > mid) val += self(self, rc, l, r);
 	return val;
@@ -87,6 +87,123 @@ int main() {
 		else cout << query(query, 1, x, y) << endl;
 	} 
 	return 0;
+}
+```
+
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+const (
+	N int = 1e5 + 100
+)
+
+type Segment struct {
+	l, r    int
+	dat, lz int
+}
+
+var (
+	a [N]int
+	t [N << 2]Segment
+)
+
+func get(p int) (int, int, int) {
+	return p << 1, p<<1 | 1, (t[p].l + t[p].r) >> 1
+}
+
+func pushup(p int) {
+	lc, rc, _ := get(p)
+	t[p].dat = t[lc].dat + t[rc].dat
+}
+
+func build(p, l, r int) {
+	t[p].l = l
+	t[p].r = r
+	if l == r {
+		t[p].dat = a[l]
+		return
+	}
+	lc, rc, mid := get(p)
+	build(lc, l, mid)
+	build(rc, mid+1, r)
+	pushup(p)
+}
+
+func spread(p int) {
+	if t[p].lz == 0 {
+		return
+	}
+	lc, rc, _ := get(p)
+	t[lc].dat += (t[lc].r - t[lc].l + 1) * t[p].lz
+	t[rc].dat += (t[rc].r - t[rc].l + 1) * t[p].lz
+	t[lc].lz += t[p].lz
+	t[rc].lz += t[p].lz
+	t[p].lz = 0
+}
+
+func update(p, l, r, val int) {
+	if l <= t[p].l && t[p].r <= r {
+		t[p].dat += (t[p].r - t[p].l + 1) * val
+		t[p].lz += val
+		return
+	}
+	spread(p)
+	lc, rc, mid := get(p)
+	if l <= mid {
+		update(lc, l, r, val)
+	}
+	if r > mid {
+		update(rc, l, r, val)
+	}
+	pushup(p)
+}
+
+func query(p, l, r int) int {
+	if l <= t[p].l && t[p].r <= r {
+		return t[p].dat
+	}
+	spread(p)
+	val := 0
+	lc, rc, mid := get(p)
+	if l <= mid {
+		val += query(lc, l, r)
+	}
+	if r > mid {
+		val += query(rc, l, r)
+	}
+	return val
+}
+
+func main() {
+	in := bufio.NewReader(os.Stdin)
+	out := bufio.NewWriter(os.Stdout)
+	defer out.Flush()
+	var n, m int
+	fmt.Fscan(in, &n, &m)
+
+	for i := 1; i <= n; i++ {
+		fmt.Fscan(in, &a[i])
+	}
+	build(1, 1, n)
+	for ; m > 0; m-- {
+		var op, x, y, k int
+		fmt.Fscan(in, &op, &x, &y)
+		if op == 1 {
+			fmt.Fscan(in, &k)
+			update(1, x, y, k)
+		} else {
+			fmt.Fprintln(out, query(1, x, y))
+		}
+
+	}
 }
 ```
 
