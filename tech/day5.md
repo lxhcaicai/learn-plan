@@ -49,6 +49,71 @@ int main() {
 }
 ```
 
+Go版本
+
+``` go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+
+	read := func() (x int) {
+		in.Scan()
+		flag := 1
+		for _, b := range in.Bytes() {
+			if b == '-' {
+				flag = -1
+				continue
+			}
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+		return x * flag
+	}
+
+	n, m := read(), read()
+	c := make([]int, n+2)
+
+	add := func(x, val int) {
+		for ; x <= n; x += x & -x {
+			c[x] += val
+		}
+	}
+
+	query := func(x int) (res int) {
+		res = 0
+		for ; x > 0; x -= x & -x {
+			res += c[x]
+		}
+		return res
+	}
+
+	for i := 1; i <= n; i++ {
+		x := read()
+		add(i, x)
+	}
+
+	for ; m > 0; m-- {
+		var op, x, y int
+		op, x, y = read(), read(), read()
+		if op == 1 {
+			add(x, y)
+		} else {
+			fmt.Println(query(y) - query(x-1))
+		}
+	}
+
+}
+
+```
+
 
 
 # c++ 部分
