@@ -2,7 +2,7 @@
 
 # 算法刷题
 
-[最长回文子串](https://www.acwing.com/problem/content/description/1526/s)
+[最长回文子串](https://www.acwing.com/problem/content/description/1526)
 
 Go 版本
 

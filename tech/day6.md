@@ -59,6 +59,73 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+const N int = 5e5 + 100
+
+func main() {
+
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+
+	read := func() (x int) {
+		in.Scan()
+		flag := 1
+		for _, b := range in.Bytes() {
+			if b == '-' {
+				flag = -1
+				continue
+			}
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+		return x * flag
+	}
+
+	n, m := read(), read()
+	c := make([]int, n+2)
+	add := func(x, val int) {
+		for ; x <= n; x += x & -x {
+			c[x] += val
+		}
+	}
+	a := make([]int, n+2)
+	for i := 1; i <= n; i++ {
+		a[i] = read()
+		add(i, a[i]-a[i-1])
+	}
+
+	query := func(x int) (res int) {
+		res = 0
+		for ; x > 0; x -= x & -x {
+			res += c[x]
+		}
+		return res
+	}
+
+	for ; m > 0; m-- {
+		op, x := read(), read()
+		if op == 1 {
+			y, k := read(), read()
+			add(x, k)
+			add(y+1, -k)
+		} else {
+			fmt.Printf("%d\n", query(x))
+		}
+	}
+
+}
+
+```
+
 
 
 [【模板】线段树 2](https://www.luogu.com.cn/problem/P3373)
@@ -167,6 +234,155 @@ int main() {
 		else std::cout << query(query, 1, x, y) << std::endl;
 	} 
 	return 0;
+}
+
+```
+
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+const N = 1e5 + 100
+
+type Segment struct {
+	l, r          int
+	dat, alz, mlz int
+}
+
+var (
+	MOD int
+	t   [N << 2]Segment
+	a   [N]int
+)
+
+func get(p int) (int, int, int) {
+	return p << 1, p<<1 | 1, (t[p].l + t[p].r) >> 1
+}
+
+func pushup(p int) {
+	lc, rc, _ := get(p)
+	t[p].dat = (t[lc].dat + t[rc].dat) % MOD
+}
+
+func build(p, l, r int) {
+	t[p].l = l
+	t[p].r = r
+	t[p].alz = 0
+	t[p].mlz = 1
+	if l == r {
+		t[p].dat = a[l]
+		return
+	}
+	lc, rc, mid := get(p)
+	build(lc, l, mid)
+	build(rc, mid+1, r)
+	pushup(p)
+}
+
+func spread(p int) {
+	lc, rc, _ := get(p)
+	t[lc].dat = (t[lc].dat*t[p].mlz + (t[lc].r-t[lc].l+1)*t[p].alz) % MOD
+	t[rc].dat = (t[rc].dat*t[p].mlz + (t[rc].r-t[rc].l+1)*t[p].alz) % MOD
+	t[lc].mlz = t[lc].mlz * t[p].mlz % MOD
+	t[rc].mlz = t[rc].mlz * t[p].mlz % MOD
+	t[lc].alz = (t[lc].alz*t[p].mlz + t[p].alz) % MOD
+	t[rc].alz = (t[rc].alz*t[p].mlz + t[p].alz) % MOD
+	t[p].alz = 0
+	t[p].mlz = 1
+}
+
+func query(p, l, r int) int {
+	if l <= t[p].l && t[p].r <= r {
+		return t[p].dat
+	}
+	spread(p)
+	val := 0
+	lc, rc, mid := get(p)
+	if l <= mid {
+		val += query(lc, l, r)
+	}
+	if r > mid {
+		val += query(rc, l, r)
+	}
+	return val % MOD
+}
+
+func addUpdate(p, l, r, val int) {
+	if l <= t[p].l && t[p].r <= r {
+		t[p].alz = (t[p].alz + val) % MOD
+		t[p].dat = (t[p].dat + (t[p].r-t[p].l+1)*val) % MOD
+		return
+	}
+	spread(p)
+	lc, rc, mid := get(p)
+	if l <= mid {
+		addUpdate(lc, l, r, val)
+	}
+	if r > mid {
+		addUpdate(rc, l, r, val)
+	}
+	pushup(p)
+}
+
+func mulUpdate(p, l, r, val int) {
+	if l <= t[p].l && t[p].r <= r {
+		t[p].mlz = (t[p].mlz * val) % MOD
+		t[p].alz = (t[p].alz * val) % MOD
+		t[p].dat = t[p].dat * val % MOD
+		return
+	}
+	spread(p)
+	lc, rc, mid := get(p)
+	if l <= mid {
+		mulUpdate(lc, l, r, val)
+	}
+	if r > mid {
+		mulUpdate(rc, l, r, val)
+	}
+	pushup(p)
+}
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+
+	read := func() (x int) {
+		in.Scan()
+		flag := 1
+		for _, b := range in.Bytes() {
+			if b == '-' {
+				flag = -1
+				continue
+			}
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+		return x * flag
+	}
+	var n, m int
+	n, m, MOD = read(), read(), read()
+	for i := 1; i <= n; i++ {
+		a[i] = read()
+	}
+	build(1, 1, n)
+	for ; m > 0; m-- {
+		op, x, y := read(), read(), read()
+		if op == 1 {
+			k := read()
+			mulUpdate(1, x, y, k)
+		} else if op == 2 {
+			k := read()
+			addUpdate(1, x, y, k)
+		} else {
+			fmt.Println(query(1, x, y))
+		}
+	}
 }
 
 ```
