@@ -16,7 +16,7 @@ select id, device_id, gender, age, university, province from user_profile
 select device_id, gender, age, university from user_profile
 ```
 
-### [3.查询结果去重]()
+### [3.查询结果去重](https://www.nowcoder.com/practice/82ebd89f12cf48efba0fecb392e193dd?tpId=199&tags=&title=&difficulty=0&judgeStatus=0&rp=0&sourceUrl=%2Fexam%2Foj%3Fpage%3D1%26tab%3DSQL%E7%AF%87%26topicId%3D199)
 
 distinct 关键字
 
