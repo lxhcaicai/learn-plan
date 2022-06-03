@@ -75,6 +75,101 @@ int main() {
 } 
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"math"
+	"os"
+)
+
+const N int = 5e5 + 100
+
+var (
+	ver, head, nex [N << 1]int
+	f              [N][30]int
+	d              [N]int
+	tot            int = 0
+	t              int
+)
+
+func addedge(x, y int) {
+	tot++
+	ver[tot] = y;
+	nex[tot] = head[x];
+	head[x] = tot
+}
+
+func dfs(x, fa int) {
+	d[x] = d[fa] + 1
+	f[x][0] = fa
+	for i := 1; i <= t; i++ {
+		f[x][i] = f[f[x][i-1]][i-1]
+	}
+	for i := head[x]; i != 0; i = nex[i] {
+		y := ver[i]
+		if y == fa {
+			continue
+		}
+		dfs(y, x)
+	}
+}
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+		return x
+	}
+	n, m, s := read(), read(), read()
+	for i := 1; i < n; i++ {
+		x, y := read(), read()
+		addedge(x, y)
+		addedge(y, x)
+	}
+	t = int(math.Log2(float64(n))) + 1
+	dfs(s, 0)
+
+	lca := func(x, y int) int {
+		if d[x] > d[y] {
+			x, y = y, x
+		}
+		for i := t; i >= 0; i-- {
+			if d[f[y][i]] >= d[x] {
+				y = f[y][i]
+			}
+		}
+		if y == x {
+			return x
+		}
+		for i := t; i >= 0; i-- {
+			if f[x][i] != f[y][i] {
+				x = f[x][i]
+				y = f[y][i]
+			}
+		}
+		return f[x][0]
+	}
+
+	for ; m > 0; m-- {
+		x, y := read(), read()
+		fmt.Println(lca(x, y))
+	}
+}
+
+```
+
+
+
 # 技术部分
 
 # c++ 部分待补

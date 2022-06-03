@@ -44,6 +44,73 @@ int main() {
 }
 ```
 
+Go 版本
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+const N int = 1e4 + 100
+
+var (
+	fa [N]int
+)
+
+func find(x int) int {
+	if x == fa[x] {
+		return x
+	} else {
+		fa[x] = find(fa[x])
+		return fa[x]
+	}
+}
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Split(bufio.ScanWords)
+
+	read := func() (x int) {
+		in.Scan()
+		for _, b := range in.Bytes() {
+			x = (x << 1) + (x << 3) + int(b-'0')
+		}
+		return x
+	}
+
+	n, m := read(), read()
+	for i := 1; i <= n; i++ {
+		fa[i] = i
+	}
+	for ; m > 0; m-- {
+		op, x, y := read(), read(), read()
+
+		if op == 1 {
+			x = find(x)
+			y = find(y)
+			if x != y {
+				fa[x] = y
+			}
+		} else {
+			x = find(x)
+			y = find(y)
+			if x == y {
+				fmt.Println("Y")
+			} else {
+				fmt.Println(9"N")
+			}
+		}
+	}
+}
+
+```
+
+
+
 # 技术部分
 
 strngbad.h
