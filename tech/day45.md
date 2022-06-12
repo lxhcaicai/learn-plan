@@ -1,3 +1,48 @@
+
+
+## 算法刷题
+
+[股票买卖 IV](https://www.acwing.com/problem/content/description/1059/)
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+const int N = 1e5 + 100;
+const int M = 110;
+int f[N][M][2];
+
+// f[i][j][0] 第i天进行第j次交易手中没有股票的利润
+// f[i][j][1] 第i天进行第j次交易手中有股票的利润
+
+int main() {
+    int n, k;
+    cin >> n >> k;
+    
+    memset(f, -0x3f, sizeof(f));
+    for(int i = 0; i <= n; i ++) {
+        f[i][0][0] = 0;
+    }
+    for(int i = 1; i <= n; i ++) {
+        int w;
+        cin >> w;
+        for(int j = 1; j <= k; j ++) {
+            f[i][j][0] = max(f[i - 1][j][0], f[i - 1][j][1] + w);
+            f[i][j][1] = max(f[i - 1][j][1], f[i - 1][j - 1][0] - w);
+        }
+    }
+    int ans = 0;
+    for(int i = 1; i <= k; i ++) {
+        ans = max(ans, f[n][i][0]);
+    }
+    cout << ans << endl;
+    return 0;
+}
+```
+
+
+
 ## 网络、模板与网页应用
 
 ### 用模板编写网页应用

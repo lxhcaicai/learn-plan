@@ -41,6 +41,91 @@ int main() {
 } 
 ```
 
+Java 版本
+
+```java
+import java.util.Scanner;
+
+/**
+ * @ClassName Main
+ * @Description TODD
+ * @Autor LXH
+ * @Date 2022/6/10 22:30
+ */
+
+public class Main {
+    final static int N = (int) (1e5 + 100);
+
+    static int a[] = new int[N];
+    static int n = 0;
+
+    static void qsort(int l, int r) {
+        int mid = a[(l + r) >> 1], i = l, j = r;
+        while(i < j) {
+            while(a[i] < mid) i ++;
+            while(a[j] > mid) j --;
+
+            if (i <= j) {
+               int tmp = a[i];
+               a[i] = a[j];
+               a[j] = tmp;
+
+               i ++; j --;
+            }
+        }
+        if (i < r) qsort(i, r);
+        if (l < j) qsort(l, j);
+    }
+
+    public static void main(String[] args) {
+
+        Scanner scanner = new Scanner(System.in);
+        n = scanner.nextInt();
+        for(int i = 1; i <= n; i ++) {
+            a[i] = scanner.nextInt();
+        }
+        qsort(1, n);
+        for(int i =1; i <= n; i ++) {
+            System.out.printf("%d ", a[i]);
+        }
+    }
+}
+
+```
+
+Java api 版本
+
+```java
+import java.util.Arrays;
+import java.util.Scanner;
+
+/**
+ * @ClassName Main
+ * @Description TODD
+ * @Autor LXH
+ * @Date 2022/6/10 22:30
+ */
+
+public class Main {
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        int n = scanner.nextInt();
+        int a[] = new int[n + 2];
+        for (int i = 1; i <= n; i ++) {
+            a[i] = scanner.nextInt();
+        }
+        // 初始位置加上偏移量 比如说 n 个数组 1~ n 排序
+        Arrays.sort(a, 1, n + 1);
+
+        for(int i = 1; i <= n; i ++) {
+            System.out.printf("%d ", a[i]);
+        }
+    }
+}
+
+```
+
 
 
 # 技术部分

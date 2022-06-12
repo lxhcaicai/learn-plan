@@ -94,6 +94,52 @@ func main() {
 
 ```
 
+java 版本
+
+```java
+import java.util.Arrays;
+import java.util.Scanner;
+
+/**
+ * @ClassName Main
+ * @Description TODD
+ * @Autor LXH
+ * @Date 2022/6/10 22:30
+ */
+
+public class Main {
+    static  final int N = 20;
+    static  int dis[][] = new int[N][N];
+    static int f[][] = new int[1 << N][N];
+    static  int n;
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        n = scanner.nextInt();
+        for(int i = 0; i < n; i ++) {
+            for(int j = 0; j < n; j ++) {
+                dis[i][j] = scanner.nextInt();
+            }
+        }
+        for(int i = 0; i < (1 << N); i ++) Arrays.fill(f[i], 0x3f3f3f3f);
+        f[1][0] = 0;
+        for(int i = 1; i < (1 << n); i ++) {
+            for(int j = 0; j < n; j ++) {
+                if((i >> j & 1)  == 1) {
+                    for(int k = 0; k < n; k ++) {
+                        if(((i^(1 << j)) >> k & 1) == 1) {
+                            f[i][j] = Integer.min(f[i][j], f[i^(1 << j)][k] + dis[k][j]);
+                        }
+                    }
+                }
+            }
+        }
+
+        System.out.println(f[(1 << n) - 1][n - 1]);
+    }
+}
+
+```
+
 
 
 

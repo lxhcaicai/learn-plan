@@ -1,3 +1,38 @@
+[大盗阿福](https://www.acwing.com/problem/content/1051/)
+
+## 算法刷题
+
+```c++
+#include <bits/stdc++.h>
+
+using namespace std;
+
+int main() {
+    int T;
+    cin >> T;
+    while(T --) {
+        int n;
+        cin >> n;
+        vector<int> a(n + 1, 0);
+        for(int i =1; i <= n; i ++) {
+            cin >> a[i];
+        }
+        
+        vector<vector<int>> f(n + 1, vector<int>(2, 0));
+        
+        f[1][1] = a[1];
+        for(int i = 2; i <= n; i ++) {
+            f[i][0] = max(f[i - 1][1], f[i - 1][0]);
+            f[i][1] = max(f[i - 1][0], f[i - 2][1]) + a[i];
+        }
+        cout << max(f[n][0], f[n][1]) << endl;
+    }
+    return 0;
+}
+```
+
+
+
 ## 网络、模板与网页应用
 
 ### tcp 服务器
