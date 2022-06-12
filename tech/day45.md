@@ -2,7 +2,7 @@
 
 ## 算法刷题
 
-[股票买卖 IV](https://www.acwing.com/problem/content/description/1059/)
+### [股票买卖 IV](https://www.acwing.com/problem/content/description/1059/)
 
 ```cpp
 #include <bits/stdc++.h>
@@ -41,7 +41,35 @@ int main() {
 }
 ```
 
+### [股票买卖 V](https://www.acwing.com/problem/content/description/1060/)
 
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+const int N = 1E5 + 100;
+
+int f[N][3]; // 0 卖出， 1 买入， 2 冷冻期
+
+int main() {
+    int n;
+    cin >> n;
+    
+    memset(f, -0x3f, sizeof(f));
+    for(int i = 0; i <= n; i ++) {
+        f[i][0] = 0;
+    }
+    for(int i = 1; i <= n; i ++) {
+        int w;
+        cin >> w;
+        f[i][2] = f[i - 1][1] + w; // 冷冻期， 前一天卖了股票
+        f[i][1] = max(f[i - 1][1], f[i - 1][0] - w); // 有股票， 由前一天买股票 或者 前一天 有股票转化而来
+        f[i][0] = max(f[i - 1][2], f[i - 1][0]); // 非冷冻期 由 前一天冷冻期或者 由前一天非冷冻期 转化而来 
+    }
+    cout << max({f[n][0], f[n][2]}); //非冷冻期 和 冷冻期中选择一个股票最大的
+}
+```
 
 ## 网络、模板与网页应用
 
