@@ -1,3 +1,81 @@
+
+
+# 算法刷题
+
+## [小国王](https://www.acwing.com/problem/content/1066/)
+
+状态压缩DP
+
+```c++
+#include <bits/stdc++.h>
+
+using namespace std;
+using LL = long long;
+
+const int N = 12, M = 12 * 12, S = 1 << 10;
+
+LL f[N][M][S]; //f[i][j][s] 表示第 i 行 一共摆放了 j 个且第 i 行状态为 s 的方案数
+vector<int> state;
+vector<int> head[M];
+int cnt[S];
+int n, m;
+
+// 检测合法状态
+bool check(int state) {
+    for(int i = 0; i < n; i ++) {
+        if ((state >> i & 1) && (state >> (i + 1 )& 1)) 
+            return false;
+    }
+    return true;
+}
+
+// 计算同一行的1的个数
+int count(int x) {
+    int ans = 0;
+    for(int i = 0; i < n; i ++) 
+        ans += (x >> i & 1);
+    return ans;
+}
+
+int main() {
+    cin >> n >> m;
+    
+    for(int i = 0; i < (1 << n); i ++) {
+        if(check(i)) {
+            state.push_back(i);
+            cnt[i] = count(i);
+        }
+    }
+    
+    for(int i = 0; i < state.size(); i ++) {
+        for(int j = 0; j < state.size(); j ++) {
+            int a = state[i], b = state[j];
+            if((a & b) == 0 && check(a | b)) {
+                head[i].push_back(j);
+            }
+        }
+    }
+    
+    f[0][0][0] = 1;
+    for(int i = 1; i <= n + 1; i ++) {
+        for(int j = 0; j <= m; j ++) {
+            for(int a = 0; a < state.size(); a ++) {
+                for(int b : head[a]){
+                    int c = cnt[state[b]];
+                    if (j >= c) 
+                        f[i][j][b] += f[i - 1][j- c][a];
+                } 
+            }
+        }
+    }
+    
+    cout << f[n + 1][m][0] << endl;
+    
+}
+```
+
+
+
 # 技术学习
 
 ## 基于服务注册与发现的string-service
