@@ -1,3 +1,90 @@
+
+
+# 算法刷题
+
+##  [愤怒的小鸟](https://www.acwing.com/problem/content/description/526/)
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+const int N = 18, M = 1 << 18;
+const double eps = 1e-6;
+
+#define PDD pair<double, double>
+PDD p[N];
+int path[N][N];
+int f[M];
+
+int cmp(double x, double y) {
+    if (fabs(x - y) < eps) return 0;
+    if (x > y) return 1;
+    else return -1;
+}
+
+int main() {
+    int T;
+    cin >> T;
+    while(T --) {
+       
+        int n, m;
+        cin >> n >> m;
+        for(int i = 0; i < n; i ++) {
+            double x, y;
+            cin >> x >> y;
+            p[i] = {x, y};
+        }
+        
+         memset(path, 0, sizeof(path));
+        for(int i = 0; i < n; i ++) {
+            path[i][i] = 1 << i;
+            for(int j = 0; j < n; j ++) {
+                double x1 = p[i].first, y1 = p[i].second;
+                double x2 = p[j].first, y2 = p[j].second;
+                
+                if(!cmp(x1, x2)) continue;
+                
+                double a = (y1/x1 - y2/x2) / (x1 - x2);
+                double b = y1/x1 - a * x1;
+                
+                if( cmp(a, 0) >= 0) continue;
+                
+                int state = 0;
+                for(int k = 0; k < n; k ++) {
+                    double x = p[k].first, y = p[k].second;
+                    
+                    if(!cmp(a*x*x + b*x, y)) state |= 1 << k;
+                }
+                path[i][j] = state;
+            }
+        }
+        
+        memset(f, 0x3f, sizeof f);
+        f[0] = 0;
+        
+        for(int i = 0; i + 1 < (1 << n); i ++) {
+            int x = 0;
+            for(int j = 0; j < n; j ++) {
+                if (!(i >> j & 1)){
+                    x = j; 
+                    break;
+                }
+            }
+            
+            for(int j = 0; j < n; j ++) {
+                f[i|path[x][j]] = min(f[i|path[x][j]], f[i] + 1);
+            }
+        }
+        
+        cout << f[(1 << n) - 1] << endl;
+    }
+    return 0;
+}
+```
+
+
+
 # 技术部分
 
 ## go 设计模式

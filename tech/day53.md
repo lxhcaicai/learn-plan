@@ -1,3 +1,91 @@
+# 算法刷题
+
+## [炮兵阵地](https://www.acwing.com/problem/content/description/294/)
+
+状态压缩DP
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+const int N = 1 << 10;
+// 棋子攻击范围是 2，我们只压缩当前层一层状态后进行转移，是不能保证该次转移是 合法的
+// 压缩存储两层的信息，然后枚举合法的第 i−2 层状态进行转移即可
+int f[2][N][N]; 
+int cnt[N];
+vector<int> state;
+int n, m;
+int sta[110];
+
+bool check(int state){
+    for(int i = 0; i < m; i ++) {
+        if ((state >> i & 1) && ((state >> i + 1 & 1) || state >> i + 2 & 1))
+            return false;
+    }
+    return true;
+}
+
+int count(int state) {
+    int ans = 0;
+    for(int i = 0; i < m; i ++) {
+        ans += (state >> i & 1);
+    }
+    return ans;
+}
+
+int main() {
+    cin >> n >> m;
+    for(int i = 0; i < (1 << m); i ++) {
+        if(check(i)) {
+            state.push_back(i);
+            cnt[i] = count(i);
+        }
+    }
+    
+    for(int i = 1; i <= n; i ++) {
+        for(int j = 1; j <= m; j ++) {
+            char c;
+            cin >> c;
+            if(c == 'P') sta[i] |= 1 << (j - 1);
+        }
+    }
+    
+    sta[n + 1] = (1 << m) - 1;
+    f[0][0][0] = 0;
+    
+    for(int i = 1; i <= n; i ++) {
+        for(int j = 0; j < state.size(); j ++) {
+            for(int k = 0; k < state.size(); k ++) {
+                for(int u = 0; u < state.size(); u ++) {
+                    int a = state[j], b = state[k], c = state[u];
+                    if(a&b | a&c | b&c) continue;
+                    // 上一排和这一排都符合条件
+                    if((sta[i] | a) == sta[i] && (sta[i - 1] | b) == sta[i - 1])
+                        f[i&1][k][j] = max(f[i&1][k][j], f[(i - 1)&1][u][k] + cnt[a]);
+                }
+            }
+        }
+    }
+
+    
+    int ans  = 0;
+    for(int i = 0; i < state.size(); i ++) {
+        for(int j = 0; j < state.size(); j ++) {
+            ans = max(ans, f[n&1][i][j]);
+        }
+    }
+    
+    cout << ans << endl;
+    
+    return 0;
+}
+```
+
+
+
+# 技术学习
+
 ## 构建web 服务器学习
 
 ### Go Web 请求体解析

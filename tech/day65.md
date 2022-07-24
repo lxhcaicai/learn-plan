@@ -1,3 +1,73 @@
+# 算法练习
+
+## [城堡问题](https://www.acwing.com/problem/content/1100/)
+
+Flood Fill
+
+```cpp
+#include <bits/stdc++.h>
+
+using namespace std;
+
+const int N = 100;
+
+#define pii pair<int, int> 
+
+int g[N][N];
+
+const int dx[] = {0, -1, 0, 1};
+const int dy[] = {-1, 0, 1, 0};
+
+int n, m;
+bool isok(int x, int y) {
+    return 1 <= x && x <= n && 1 <= y && y <= m;
+}
+
+bool vis[N][N];
+int bfs(int x, int y) {
+    int area = 0;
+    queue<pii> q;
+    q.push({x, y});
+    while(!q.empty()) {
+        pii no = q.front(); q.pop();
+        int x = no.first, y = no.second;
+        if(vis[x][y]) continue;
+        area ++;
+        vis[x][y] = 1;
+        for(int i = 0; i < 4; i ++) {
+            int nx = x + dx[i];
+            int ny = y + dy[i];
+            if(!isok(nx, ny)) continue;
+            if(g[x][y] >> i & 1) continue;
+            q.push({nx, ny});
+        }
+    }
+    return area;
+}
+
+int main() {
+    cin >> n >> m;
+    for(int i = 1; i <= n; i ++) {
+        for(int j = 1; j <= m; j ++) {
+            cin >> g[i][j];
+        }
+    }
+    int ans = 0, area = 0;
+    for(int i = 1; i <= n; i ++) {
+        for(int j = 1; j <= m; j ++) {
+            if(! vis[i][j]) {
+                ans ++;
+                area = max(area, bfs(i, j));
+            }
+        }
+    }
+    cout << ans << endl << area;
+    return 0;
+}
+```
+
+
+
 ## SQL 练习
 
 ### [1. 查询所有列](https://www.nowcoder.com/practice/f9f82607cac44099a77154a80266234a?tpId=199&tqId=1971219&ru=/exam/oj&qru=/ta/sql-quick-study/question-ranking&sourceUrl=%2Fexam%2Foj%3Fpage%3D1%26tab%3DSQL%25E7%25AF%2587%26topicId%3D199)
