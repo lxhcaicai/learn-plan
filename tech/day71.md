@@ -1,3 +1,81 @@
+## 算法学习
+
+### [最短网络](https://www.acwing.com/problem/content/1142/)
+
+最小生成树
+
+```java
+import java.util.Arrays;
+import java.util.Scanner;
+
+public class Main {
+
+    static final int N = 20000;
+
+    static class Edge implements Comparable<Edge>{
+        int x, y, z;
+
+        public Edge(int x, int y, int z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        @Override
+        public int compareTo(Edge o) {
+            return z - o.z;
+        }
+    }
+
+    static Edge[] edges = new Edge[N];
+    static int[] fa = new int[N];
+    static int find(int x) {
+        if(x == fa[x]) return x;
+        else {
+            fa[x] = find(fa[x]);
+            return fa[x];
+        }
+    }
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        int n = scanner.nextInt();
+        int m = n * n;
+        for(int i = 1; i <= n; i ++) {
+            for(int j = 1; j <= n; j ++) {
+                int z = scanner.nextInt();
+                edges[n * (i - 1) + j] = new Edge(i, j, z);
+            }
+        }
+        Arrays.sort(edges, 1, 1 + m);
+        int cnt = 0;
+        int ans = 0;
+        for(int i = 1; i <= n; i ++) fa[i] = i;
+        for(int i = 1; i <= m; i ++) {
+            int x = edges[i].x;
+            int y = edges[i].y;
+            int z = edges[i].z;
+           // System.out.println("---" + x + " " + y + " " + z);
+            x = find(x);
+            y = find(y);
+            if(x != y) {
+                cnt ++;
+                ans += z;
+                fa[x] = y;
+            }
+            if(cnt == n - 1) break;
+        }
+        System.out.println(ans);
+    }
+}
+
+
+```
+
+
+
+## 八股文
+
 ### 1.说说线程的状态?
 
 创建、就绪、运行、阻塞、销毁。 new一个线程后就是创建状态，执行start()方法后处于就绪状态，处于就绪状态的线程获取了cpu之后，就开始执行run()方法，这时属于运行状态，当调用sleeo()方法时就进入了人阻塞状态，最后run()方法执行完或者抛出一个异常时就销毁了。

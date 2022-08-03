@@ -1,3 +1,101 @@
+## 算法学习
+
+### [最优乘车](https://www.acwing.com/problem/content/922/)
+
+单源最短路的建图方式
+
+```java
+import java.util.Arrays;
+import java.util.PriorityQueue;
+import java.util.Scanner;
+
+public class Main {
+    static final int N = (int) (1E5 + 100);
+
+    static int[] head = new int[N];
+    static int[] ver = new int[N];
+    static int[] nex = new int[N];
+
+    static int tot = 0;
+    static void addedge(int x, int y) {
+        ver[ ++ tot] = y;
+        nex[tot] = head[x];
+        head[x] = tot;
+    }
+
+    static int[] dis = new int[N];
+    static boolean[] vis = new boolean[N];
+
+    static class Node implements Comparable<Node>{
+        int dis;
+        int x;
+
+        public Node(int dis, int x) {
+            this.dis = dis;
+            this.x = x;
+        }
+
+        @Override
+        public int compareTo(Node o) {
+            return dis - o.dis;
+        }
+    }
+
+    static int dijkstra(int st, int ed) {
+        Arrays.fill(dis, Integer.MAX_VALUE);
+        PriorityQueue<Node> queue = new PriorityQueue<>();
+        queue.add(new Node(0, 1));
+        dis[st] = 0;
+        while(queue.size() > 0) {
+            Node no = queue.peek(); queue.poll();
+            int x = no.x;
+            if(vis[x]) continue;
+            vis[x] = true;
+            for(int i = head[x]; i != 0; i = nex[i]) {
+                int y = ver[i];
+                if(dis[y] > dis[x] + 1) {
+                    dis[y] = dis[x] + 1;
+                    queue.add(new Node(dis[y], y));
+                }
+            }
+        }
+        if(dis[ed] == Integer.MAX_VALUE) return Integer.MAX_VALUE;
+
+        return dis[ed] - 1;
+    }
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        int m = scanner.nextInt();
+        int n = scanner.nextInt();
+        scanner.nextLine();
+        for(; m > 0; m --) {
+            String[] ss = scanner.nextLine().split(" ");
+            for(int i = 0; i < ss.length; i ++) {
+                for(int j = i + 1; j < ss.length; j ++) {
+                    int x = Integer.parseInt(ss[i]);
+                    int y = Integer.parseInt(ss[j]);
+                    addedge(x, y);
+                }
+            }
+        }
+        int ans = dijkstra(1, n);
+        if(ans == Integer.MAX_VALUE) {
+            System.out.println("NO");
+        }
+        else {
+             System.out.println(ans);
+        }
+    }
+}
+
+
+```
+
+
+
+## 八股文
+
 ### 1.说说你了解的线程通信方式
 
 在Java中提供了两种多线程通信方式分别是利用monitor实现通信方式和使用condition实现线程通信方式。使用不同的线程同步方式也就相应的使用不同的线程通信方式。当我们使用synchronize同步时就会使用monitor来实现线程通信，这里的monitor其实就是锁对象，其利用object的wait，notify，notifyAll等方法来实现线程通信。而使用Lock进行同步时就是使用Condition来实现线程通信，Condition对象通过Lock创建出来依赖于Lock对象，使用其await，sign或signAll方法实现线程通信。
